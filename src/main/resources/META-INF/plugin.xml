@@ -1,32 +1,15 @@
 <!-- Plugin Configuration File. Read more: https://plugins.jetbrains.com/docs/intellij/plugin-configuration-file.html -->
 <idea-plugin>
     <id>com.github.feelixs.sshplugin</id>
-    <name>SSH Password Manager</name>
-    <vendor email="your@email.com" url="https://github.com/feelixs">feelixs</vendor>
-    <description><![CDATA[
-        Secure SSH credential manager with password storage and one-click connections.
-    ]]></description>
+    <name>ssh-plugin</name>
+    <vendor>feelixs</vendor>
 
     <depends>com.intellij.modules.platform</depends>
-    <depends>com.intellij.terminal</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.feelixs.sshplugin.toolWindow.MyToolWindowFactory" 
-                   id="SSHCredentials" 
-                   anchor="right"
-                   icon="AllIcons.General.Ssh"/>
-        <projectService serviceImplementation="com.github.feelixs.sshplugin.services.SSHCredentialService"/>
+        <toolWindow factoryClass="com.github.feelixs.sshplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
+        <postStartupActivity implementation="com.github.feelixs.sshplugin.startup.MyProjectActivity" />
     </extensions>
-
-    <actions>
-        <action id="SSHPlugin.ConnectAction" 
-                class="com.github.feelixs.sshplugin.actions.SSHConnectAction"
-                text="SSH Connector" 
-                description="Open SSH credential manager">
-            <add-to-group group-id="ToolsMenu" anchor="last"/>
-            <keyboard-shortcut keymap="$default" first-keystroke="meta shift S"/>
-        </action>
-    </actions>
 </idea-plugin>
