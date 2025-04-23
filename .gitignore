@@ -1,3 +1,4 @@
+*.salive
 *.DS_Store
 .gradle
 .idea
