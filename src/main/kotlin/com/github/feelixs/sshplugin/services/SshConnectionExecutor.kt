@@ -70,7 +70,7 @@ class SshConnectionExecutor(private val project: Project) {
                     if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) {
                         logger.info("SSH key requires passphrase for ${connectionData.alias}. Waiting for prompt...")
                         // Wait a bit longer for the "Enter passphrase for key" prompt to appear
-                        Thread.sleep(1500) // Increased wait time
+                        Thread.sleep(3000)
 
                         // Send the passphrase to the terminal, followed by a newline
                         connectionData.encodedKeyPassword?.let { keyPassword ->
