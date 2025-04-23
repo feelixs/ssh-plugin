@@ -80,40 +80,30 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     private fun encryptConnectionPasswordsImpl(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
-        if (!connection.useKey) {
-            // Store current plaintext password in the password safe (if any)
-            connection.encodedPassword?.let { plainPassword ->
-                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-                val credentials = Credentials("", plainPassword)
+        // Encrypt main password if present
+        connection.encodedPassword?.takeIf { it.isNotBlank() }?.let { plainPassword ->
+            val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+            val credentials = Credentials(connection.username, plainPassword)
+            passwordSafe.set(credentialAttributes, credentials)
+            connection.encodedPassword = "encrypted:true"
+        }
+
+        // Encrypt sudo password if present and needed
+        if (connection.osType == OsType.LINUX && connection.useSudo) {
+            connection.encodedSudoPassword?.takeIf { it.isNotBlank() }?.let { plainSudoPassword ->
+                val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
+                val credentials = Credentials(connection.username, plainSudoPassword)
                 passwordSafe.set(credentialAttributes, credentials)
-                
-                // Clear the plaintext password and set a marker
-                // Use a marker that's different from the plaintext password
-                val marker = "encrypted:" + UUID.randomUUID().toString()
-                connection.encodedPassword = marker
-            }
-        } else {
-            // Store SSH key password in the password safe (if any)
-            connection.encodedKeyPassword?.let { plainKeyPassword ->
-                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
-                val credentials = Credentials("", plainKeyPassword)
-                passwordSafe.set(credentialAttributes, credentials)
-                
-                // Clear the plaintext password and set a marker
-                val marker = "encrypted:" + UUID.randomUUID().toString()
-                connection.encodedKeyPassword = marker
+                connection.encodedSudoPassword = "encrypted:true"
             }
         }
-        
-        // Store current plaintext sudo password in the password safe (if any)
-        connection.encodedSudoPassword?.let { plainSudoPassword ->
-            val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
-            val credentials = Credentials("", plainSudoPassword)
+
+        // Encrypt key passphrase if present
+        connection.encodedKeyPassword?.takeIf { it.isNotBlank() }?.let { plainKeyPassword ->
+            val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+            val credentials = Credentials(connection.username, plainKeyPassword)
             passwordSafe.set(credentialAttributes, credentials)
-            
-            // Clear the plaintext password and set a marker
-            val marker = "encrypted:" + UUID.randomUUID().toString()
-            connection.encodedSudoPassword = marker
+            connection.encodedKeyPassword = "encrypted:true"
         }
     }
 
@@ -134,27 +124,25 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     private fun decryptConnectionPasswordsImpl(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
-        if (!connection.useKey) {
-            // Retrieve the actual password from the password safe (if any)
-            if (connection.encodedPassword != null && connection.encodedPassword!!.startsWith("encrypted:")) {
-                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-                val credentials = passwordSafe.get(credentialAttributes)
-                connection.encodedPassword = credentials?.getPasswordAsString()
-            }
-        } else {
-            // Retrieve the SSH key password from the password safe (if any)
-            if (connection.encodedKeyPassword != null && connection.encodedKeyPassword!!.startsWith("encrypted:")) {
-                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
-                val credentials = passwordSafe.get(credentialAttributes)
-                connection.encodedKeyPassword = credentials?.getPasswordAsString()
-            }
+        // Decrypt main password if marked as encrypted
+        if (connection.encodedPassword?.startsWith("encrypted:") == true) {
+            val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+            val credentials = passwordSafe.get(credentialAttributes)
+            connection.encodedPassword = credentials?.getPasswordAsString() ?: ""
         }
-        
-        // Retrieve the actual sudo password from the password safe (if any)
-        if (connection.encodedSudoPassword != null && connection.encodedSudoPassword!!.startsWith("encrypted:")) {
+
+        // Decrypt sudo password if marked as encrypted
+        if (connection.encodedSudoPassword?.startsWith("encrypted:") == true) {
             val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
             val credentials = passwordSafe.get(credentialAttributes)
-            connection.encodedSudoPassword = credentials?.getPasswordAsString()
+            connection.encodedSudoPassword = credentials?.getPasswordAsString() ?: ""
+        }
+
+        // Decrypt key passphrase if marked as encrypted
+        if (connection.encodedKeyPassword?.startsWith("encrypted:") == true) {
+            val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+            val credentials = passwordSafe.get(credentialAttributes)
+            connection.encodedKeyPassword = credentials?.getPasswordAsString() ?: ""
         }
     }
 
