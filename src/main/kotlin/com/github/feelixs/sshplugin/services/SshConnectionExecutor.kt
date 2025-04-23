@@ -6,6 +6,7 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.terminal.JBTerminalWidget
 import com.intellij.terminal.TerminalShellCommandHandler
+import org.jetbrains.plugins.terminal.ShellTerminalWidget
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 /**
@@ -49,8 +50,7 @@ class SshConnectionExecutor(private val project: Project) {
 
         // Create a terminal tab with the SSH connection name
         val tabName = connectionData.alias
-        val terminalView = terminalManager.getTerminalToolWindow(project)
-        val terminal = terminalView?.createLocalShellWidget(null, tabName)
+        val terminal = terminalManager.createLocalShellWidget(null, tabName) as? ShellTerminalWidget
         
         if (terminal == null) {
             logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
@@ -59,7 +59,7 @@ class SshConnectionExecutor(private val project: Project) {
 
         // Execute the SSH command
         logger.info("Executing command in terminal for ${connectionData.alias}")
-        terminal.executeCommand(sshCommand)
+        terminal.executeCommand(sshCommand, true)
         
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
@@ -78,7 +78,7 @@ class SshConnectionExecutor(private val project: Project) {
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             logger.info("Sending key passphrase for ${connectionData.alias}")
                             // Use password already in connectionData - no need to re-decrypt
-                            terminal.executeCommand("$keyPassword\n") // Append newline
+                            terminal.executeCommand("$keyPassword\n", true) // Append newline
                         }
 
                         // Wait for connection to establish after sending passphrase
@@ -94,7 +94,7 @@ class SshConnectionExecutor(private val project: Project) {
                     if (connectionData.osType == OsType.LINUX && connectionData.useSudo) {
                         logger.info("Attempting sudo elevation for ${connectionData.alias}")
                         // Send the sudo command to elevate privileges
-                        terminal.executeCommand("sudo -s")
+                        terminal.executeCommand("sudo -s", true)
 
                         // If a specific sudo password was provided, enter it after a short wait
                         if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
@@ -105,7 +105,7 @@ class SshConnectionExecutor(private val project: Project) {
                             connectionData.encodedSudoPassword?.let { sudoPassword ->
                                 logger.info("Sending sudo password for ${connectionData.alias}")
                                 // Use password already in connectionData - no need to re-decrypt
-                                terminal.executeCommand("$sudoPassword\n") // Append newline
+                                terminal.executeCommand("$sudoPassword\n", true) // Append newline
                                 logger.debug("Sudo password sent for ${connectionData.alias}")
                             }
                         } else {
