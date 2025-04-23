@@ -45,11 +45,9 @@ class SshConnectionExecutor(private val project: Project) {
         logger.info("Generated SSH command for ${connectionData.alias}: $sshCommand")
 
         // Create a terminal tab for the connection
-        val terminalManager = TerminalToolWindowManager.getInstance(project)
-
-        // Create a terminal tab with the SSH connection name
+        val terminalView = TerminalView.getInstance(project)
         val tabName = connectionData.alias
-        val terminal = terminalManager.createLocalShellWidget(null, tabName) as? ShellTerminalWidget
+        val terminal = terminalView.createLocalShellWidget(project.basePath ?: "", tabName) as? ShellTerminalWidget
         
         if (terminal == null) {
             logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
