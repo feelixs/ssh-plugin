@@ -1,5 +1,6 @@
 package com.github.feelixs.sshplugin.services
 
+import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
