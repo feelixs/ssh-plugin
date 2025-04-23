@@ -16,7 +16,7 @@
         <toolWindow
                 id="SSH Connections"
                 anchor="bottom"
-                icon="AllIcons.Expui.WebReferences.Server"
+                icon="AllIcons.Actions.StepOut"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
     </extensions>
 
