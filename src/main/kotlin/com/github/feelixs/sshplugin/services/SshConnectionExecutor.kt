@@ -4,8 +4,9 @@ import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.terminal.JBTerminalWidget
+import com.intellij.terminal.TerminalShellCommandHandler
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
-import org.jetbrains.plugins.terminal.TerminalWidget // Import the base interface
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
@@ -46,26 +47,19 @@ class SshConnectionExecutor(private val project: Project) {
         // Create a terminal tab for the connection
         val terminalManager = TerminalToolWindowManager.getInstance(project)
 
-        // Create a terminal widget with the SSH connection name
-        val tabName = connectionData.alias // Use alias directly for tab name
-        // Use the non-deprecated method to create a terminal widget
-        val createdWidget = terminalManager.createShellWidget(null, tabName, true, false)
-        if (createdWidget == null) {
-            logger.error("TerminalToolWindowManager.createShellWidget returned null for connection ${connectionData.alias}")
-            return false
-        }
-
-        // Attempt to cast to the base TerminalWidget interface
-        val terminalWidget = createdWidget as? TerminalWidget
-        if (terminalWidget == null) {
-            // This error should ideally not happen if createdWidget is not null, but keep for safety
-            logger.error("Failed to cast created terminal widget (${createdWidget::class.simpleName}) to TerminalWidget for connection ${connectionData.alias}")
+        // Create a terminal tab with the SSH connection name
+        val tabName = connectionData.alias
+        val terminalView = terminalManager.getTerminalToolWindow(project)
+        val terminal = terminalView?.createLocalShellWidget(null, tabName)
+        
+        if (terminal == null) {
+            logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
             return false
         }
 
         // Execute the SSH command
         logger.info("Executing command in terminal for ${connectionData.alias}")
-        terminalWidget.executeCommand(sshCommand)
+        terminal.executeCommand(sshCommand)
         
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
@@ -84,7 +78,7 @@ class SshConnectionExecutor(private val project: Project) {
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             logger.info("Sending key passphrase for ${connectionData.alias}")
                             // Use password already in connectionData - no need to re-decrypt
-                            terminalWidget.executeCommand("$keyPassword\n") // Append newline
+                            terminal.executeCommand("$keyPassword\n") // Append newline
                         }
 
                         // Wait for connection to establish after sending passphrase
@@ -100,7 +94,7 @@ class SshConnectionExecutor(private val project: Project) {
                     if (connectionData.osType == OsType.LINUX && connectionData.useSudo) {
                         logger.info("Attempting sudo elevation for ${connectionData.alias}")
                         // Send the sudo command to elevate privileges
-                        terminalWidget.executeCommand("sudo -s")
+                        terminal.executeCommand("sudo -s")
 
                         // If a specific sudo password was provided, enter it after a short wait
                         if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
@@ -111,7 +105,7 @@ class SshConnectionExecutor(private val project: Project) {
                             connectionData.encodedSudoPassword?.let { sudoPassword ->
                                 logger.info("Sending sudo password for ${connectionData.alias}")
                                 // Use password already in connectionData - no need to re-decrypt
-                                terminalWidget.executeCommand("$sudoPassword\n") // Append newline
+                                terminal.executeCommand("$sudoPassword\n") // Append newline
                                 logger.debug("Sudo password sent for ${connectionData.alias}")
                             }
                         } else {
