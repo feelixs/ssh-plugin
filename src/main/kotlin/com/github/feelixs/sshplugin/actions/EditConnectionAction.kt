@@ -9,14 +9,15 @@ import com.intellij.openapi.project.DumbAware
 class EditConnectionAction : AnAction(AllIcons.Actions.Edit), DumbAware {
 
     override fun actionPerformed(e: AnActionEvent) {
-        val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
+        val panel = e.getDataContext().getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
         panel?.editConnection()
     }
 
     override fun update(e: AnActionEvent) {
         // Enabled only if the panel is present and a connection is selected.
-        val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
-        val selectedConnection = e.getData(PluginDataKeys.SELECTED_SSH_CONNECTION)
+        val dataContext = e.dataContext
+        val panel = dataContext.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
+        val selectedConnection = dataContext.getData(PluginDataKeys.SELECTED_SSH_CONNECTION)
         e.presentation.isEnabled = panel != null && selectedConnection != null
     }
 }

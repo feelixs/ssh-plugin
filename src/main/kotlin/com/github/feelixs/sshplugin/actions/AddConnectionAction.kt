@@ -13,13 +13,13 @@ class AddConnectionAction : AnAction, DumbAware {
     constructor() : super(AllIcons.General.Add)
 
     override fun actionPerformed(e: AnActionEvent) {
-        val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
+        val panel = e.getDataContext().getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
         panel?.addConnection()
     }
 
     override fun update(e: AnActionEvent) {
         // Action is always enabled if the panel is present.
-        val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
+        val panel = e.getDataContext().getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
         e.presentation.isEnabled = panel != null
     }
 }

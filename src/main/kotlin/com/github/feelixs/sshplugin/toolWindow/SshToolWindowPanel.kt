@@ -5,6 +5,7 @@ import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
@@ -80,10 +81,26 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     fun deleteConnection() {
         val selectedConnection = connectionList.selectedValue
         if (selectedConnection != null) {
-            // TODO: Add confirmation dialog
-            connectionStorageService.removeConnection(selectedConnection.id)
-            println("Delete Connection action triggered for: ${selectedConnection.alias}")
-            loadConnections() // Reload list
+            // Show confirmation dialog before deleting
+            val confirmTitle = "Confirm Deletion"
+            val confirmMessage = "Are you sure you want to delete the connection '${selectedConnection.alias}'?"
+            
+            val result = Messages.showYesNoDialog(
+                project,
+                confirmMessage,
+                confirmTitle,
+                Messages.getQuestionIcon()
+            )
+            
+            if (result == Messages.YES) {
+                // User confirmed, proceed with deletion
+                connectionStorageService.removeConnection(selectedConnection.id)
+                println("Connection deleted: ${selectedConnection.alias}")
+                loadConnections() // Reload list
+            } else {
+                // User cancelled deletion
+                println("Deletion cancelled for: ${selectedConnection.alias}")
+            }
         }
     }
 
@@ -96,15 +113,16 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     }
 
     // --- DataProvider Implementation ---
+    override fun uiDataSnapshot(sink: DataSink) {
+        // Call the superclass implementation first
+        super.uiDataSnapshot(sink)
 
-    override fun getData(dataId: String): Any? {
-        return when {
-            // Provide the panel instance itself
-            PluginDataKeys.SSH_TOOL_WINDOW_PANEL.`is`(dataId) -> this
-            // Provide the currently selected connection
-            PluginDataKeys.SELECTED_SSH_CONNECTION.`is`(dataId) -> connectionList.selectedValue
-            // Delegate to default implementation for other keys
-            else -> super.getData(dataId)
+        // Provide the panel instance itself
+        sink.set(PluginDataKeys.SSH_TOOL_WINDOW_PANEL, this)
+
+        // Provide the currently selected connection (if it's not null)
+        connectionList.selectedValue?.let { connection ->
+            sink.set(PluginDataKeys.SELECTED_SSH_CONNECTION, connection)
         }
     }
 }
