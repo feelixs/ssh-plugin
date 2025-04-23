@@ -5,7 +5,7 @@ import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.terminal.JBTerminalWidget
-import org.jetbrains.plugins.terminal.TerminalToolWindowManager
+import com.intellij.terminal.TerminalView
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 
 /**
