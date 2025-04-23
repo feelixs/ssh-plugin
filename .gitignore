@@ -1,6 +1,8 @@
+*.DS_Store
 .gradle
 .idea
 .intellijPlatform
 .qodana
 build
 .aider*
+CLAUDE.md
