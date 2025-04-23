@@ -28,13 +28,20 @@ class PasswordEncryptionTest : BasePlatformTestCase() {
         // Add connection (triggers encryption)
         service.addConnection(testConnection)
         
+        // Wait briefly for encryption to complete
+        Thread.sleep(500)
+        
         // Get stored connection (passwords encrypted)
         val storedConnection = service.getConnections().find { it.id == testConnection.id }!!
-        assertNotEquals(testPassword, storedConnection.encodedPassword)
+        println("Stored password: ${storedConnection.encodedPassword}")
+        assertNotEquals("Password should be encrypted", testPassword, storedConnection.encodedPassword)
+        assertTrue("Password should be marked as encrypted", 
+            storedConnection.encodedPassword?.startsWith("encrypted:") == true)
         
         // Decrypt and verify
         val decryptedConnection = service.getConnectionWithPlainPasswords(testConnection.id)!!
-        assertEquals(testPassword, decryptedConnection.encodedPassword)
+        assertEquals("Decrypted password should match original", 
+            testPassword, decryptedConnection.encodedPassword)
         
         // Clean up
         service.removeConnection(testConnection.id)
