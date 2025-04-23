@@ -38,8 +38,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
 
         // List setup
         connectionList.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        // TODO: Add a cell renderer for better display (e.g., show alias)
-        // TODO: Add list selection listener to enable/disable Edit/Delete/Connect actions
+        connectionList.cellRenderer = SshConnectionListCellRenderer() // Custom renderer to display connection info
 
         val scrollPane = JBScrollPane(connectionList)
         setContent(scrollPane)
@@ -64,17 +63,35 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     // --- Public methods for actions ---
 
     fun addConnection() {
-        // TODO: Implement logic to show Add dialog
-        println("Add Connection action triggered")
-        // After adding, reload: loadConnections()
+        val dialog = SshConnectionDialog(project)
+        if (dialog.showAndGet()) {
+            // User clicked OK - get the connection data and save it
+            val newConnection = dialog.createConnectionData()
+            connectionStorageService.addConnection(newConnection)
+            println("Added new connection: ${newConnection.alias}")
+            loadConnections() // Reload the list to show the new connection
+        } else {
+            println("Add connection cancelled")
+        }
     }
 
     fun editConnection() {
         val selectedConnection = connectionList.selectedValue
         if (selectedConnection != null) {
-            // TODO: Implement logic to show Edit dialog with selectedConnection data
-            println("Edit Connection action triggered for: ${selectedConnection.alias}")
-            // After editing, reload: loadConnections()
+            // Get a copy with decrypted passwords for editing
+            val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
+            if (connectionWithPasswords != null) {
+                val dialog = SshConnectionDialog(project, connectionWithPasswords)
+                if (dialog.showAndGet()) {
+                    // User clicked OK - get the updated connection data and save it
+                    val updatedConnection = dialog.createConnectionData()
+                    connectionStorageService.updateConnection(updatedConnection)
+                    println("Updated connection: ${updatedConnection.alias}")
+                    loadConnections() // Reload the list to show the updated connection
+                } else {
+                    println("Edit connection cancelled for: ${selectedConnection.alias}")
+                }
+            }
         }
     }
 
