@@ -69,16 +69,13 @@ class SshConnectionExecutor(private val project: Project) {
                     // When using SSH key, we may need to handle the passphrase prompt
                     if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) {
                         logger.info("SSH key requires passphrase for ${connectionData.alias}. Waiting for prompt...")
-                        // Wait a bit longer for the "Enter passphrase for key" prompt to appear
                         Thread.sleep(3000)
 
                         // Send the passphrase to the terminal, followed by a newline
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             logger.info("Sending key passphrase for ${connectionData.alias}")
-                            // Make sure we actually have the decrypted password before sending it
-                            val decryptedPassword = SshConnectionStorageService.instance
-                                .getConnectionWithPlainPasswords(connectionData.id)?.encodedKeyPassword
-                            terminalWidget.executeCommand("${decryptedPassword ?: keyPassword}\n") // Append newline
+                            // Use password already in connectionData - no need to re-decrypt
+                            terminalWidget.executeCommand("$keyPassword\n") // Append newline
                         }
 
                         // Wait for connection to establish after sending passphrase
@@ -104,10 +101,9 @@ class SshConnectionExecutor(private val project: Project) {
 
                             connectionData.encodedSudoPassword?.let { sudoPassword ->
                                 logger.info("Sending sudo password for ${connectionData.alias}")
-                                // Make sure we actually have the decrypted password before sending it
-                                val decryptedPassword = SshConnectionStorageService.instance
-                                    .getConnectionWithPlainPasswords(connectionData.id)?.encodedSudoPassword
-                                terminalWidget.executeCommand("${decryptedPassword ?: sudoPassword}\n") // Append newline
+                                // Use password already in connectionData - no need to re-decrypt
+                                terminalWidget.executeCommand("$sudoPassword\n") // Append newline
+                                logger.debug("Sudo password sent for ${connectionData.alias}")
                             }
                         } else {
                             logger.info("No sudo password provided for ${connectionData.alias}. Manual entry might be required.")
