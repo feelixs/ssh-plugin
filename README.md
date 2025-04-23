@@ -4,6 +4,16 @@
 [![Version](https://img.shields.io/jetbrains/plugin/v/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 [![Downloads](https://img.shields.io/jetbrains/plugin/d/MARKETPLACE_ID.svg)](https://plugins.jetbrains.com/plugin/MARKETPLACE_ID)
 
+## About
+
+A comprehensive SSH password manager which securely initiates SSH connections to the IDE's terminal using your saved, encoded passwords. Features include:
+
+- Store all your SSH-key passwords in an easily accessible tool window.
+- Run the plugin's "SSH Connector" IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
+- You can enter server information into the corresponding SSH key's info section. What is the base-OS of your server (Windows/Linux)
+- For Linux machines, you can check off the "Automatically enter sudo mode" & provide a root password to enter escalated sudo mode by default after the SSH connection succeeds.
+- Passwords are securely saved locally via <insert encryption/etc method here>. Passwords are stored in a way which doesn't matter the OS you're using for this plugin.
+
 ## Template ToDo list
 - [x] Create a new [IntelliJ Platform Plugin Template][template] project.
 - [ ] Get familiar with the [template documentation][template].
