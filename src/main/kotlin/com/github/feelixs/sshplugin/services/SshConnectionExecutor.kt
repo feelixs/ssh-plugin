@@ -5,7 +5,7 @@ import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
-import org.jetbrains.plugins.terminal.ShellTerminalWidget
+import org.jetbrains.plugins.terminal.TerminalWidget // Import the base interface
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
@@ -55,10 +55,11 @@ class SshConnectionExecutor(private val project: Project) {
             return false
         }
 
-        // Attempt to cast to ShellTerminalWidget
-        val terminalWidget = createdWidget as? ShellTerminalWidget
+        // Attempt to cast to the base TerminalWidget interface
+        val terminalWidget = createdWidget as? TerminalWidget
         if (terminalWidget == null) {
-            logger.error("Failed to cast created terminal widget (${createdWidget::class.simpleName}) to ShellTerminalWidget for connection ${connectionData.alias}")
+            // This error should ideally not happen if createdWidget is not null, but keep for safety
+            logger.error("Failed to cast created terminal widget (${createdWidget::class.simpleName}) to TerminalWidget for connection ${connectionData.alias}")
             return false
         }
 
