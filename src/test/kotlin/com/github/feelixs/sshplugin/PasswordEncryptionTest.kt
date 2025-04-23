@@ -4,8 +4,8 @@ import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.Assertions.*
+import org.junit.Test
+import org.junit.Assert.*
 
 class PasswordEncryptionTest : BasePlatformTestCase() {
 
