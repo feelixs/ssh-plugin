@@ -4,9 +4,13 @@ import com.intellij.icons.AllIcons // Ensure AllIcons is imported
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAware
+import javax.swing.Icon
 
 // Action to add a new SSH connection configuration.
-class AddConnectionAction : AnAction(AllIcons.Actions.Add), DumbAware { // Correct usage
+class AddConnectionAction : AnAction, DumbAware {
+
+    // Use secondary constructor to pass the icon
+    constructor() : super(AllIcons.Actions.Add)
 
     override fun actionPerformed(e: AnActionEvent) {
         val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
