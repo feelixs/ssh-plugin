@@ -4,7 +4,6 @@ import com.intellij.icons.AllIcons // Ensure AllIcons is imported
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAware
-import javax.swing.Icon
 
 // Action to add a new SSH connection configuration.
 class AddConnectionAction : AnAction, DumbAware {
