@@ -48,7 +48,8 @@ class SshConnectionExecutor(private val project: Project) {
 
         // Create a terminal widget with the SSH connection name
         val tabName = connectionData.alias // Use alias directly for tab name
-        val terminalWidget = terminalManager.createLocalShellWidget(null, tabName) as? ShellTerminalWidget
+        // Use the non-deprecated method to create a terminal widget
+        val terminalWidget = terminalManager.createShellWidget(null, tabName, true, false) as? ShellTerminalWidget
         if (terminalWidget == null) {
             logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
             return false
