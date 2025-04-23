@@ -37,6 +37,7 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         // Keys prefixes used for password storage
         private const val PASSWORD_KEY_PREFIX = "password:"
         private const val SUDO_PASSWORD_KEY_PREFIX = "sudo_password:"
+        private const val KEY_PASSWORD_PREFIX = "key_password:"
         
         // Create credential attributes for a specific key
         private fun createCredentialAttributes(keyPrefix: String, connectionId: String): CredentialAttributes {
@@ -68,14 +69,26 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         // Store the actual passwords in the password safe
         val passwordSafe = PasswordSafe.instance
         
-        // Store current plaintext password in the password safe (if any)
-        connection.encodedPassword?.let { plainPassword ->
-            val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-            val credentials = Credentials("", plainPassword)
-            passwordSafe.set(credentialAttributes, credentials)
-            
-            // Clear the plaintext password and set a marker
-            connection.encodedPassword = UUID.randomUUID().toString()
+        if (!connection.useKey) {
+            // Store current plaintext password in the password safe (if any)
+            connection.encodedPassword?.let { plainPassword ->
+                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+                val credentials = Credentials("", plainPassword)
+                passwordSafe.set(credentialAttributes, credentials)
+                
+                // Clear the plaintext password and set a marker
+                connection.encodedPassword = UUID.randomUUID().toString()
+            }
+        } else {
+            // Store SSH key password in the password safe (if any)
+            connection.encodedKeyPassword?.let { plainKeyPassword ->
+                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+                val credentials = Credentials("", plainKeyPassword)
+                passwordSafe.set(credentialAttributes, credentials)
+                
+                // Clear the plaintext password and set a marker
+                connection.encodedKeyPassword = UUID.randomUUID().toString()
+            }
         }
         
         // Store current plaintext sudo password in the password safe (if any)
@@ -92,11 +105,20 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     private fun decryptConnectionPasswords(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
-        // Retrieve the actual password from the password safe (if any)
-        if (connection.encodedPassword != null) {
-            val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-            val credentials = passwordSafe.get(credentialAttributes)
-            connection.encodedPassword = credentials?.getPasswordAsString()
+        if (!connection.useKey) {
+            // Retrieve the actual password from the password safe (if any)
+            if (connection.encodedPassword != null) {
+                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+                val credentials = passwordSafe.get(credentialAttributes)
+                connection.encodedPassword = credentials?.getPasswordAsString()
+            }
+        } else {
+            // Retrieve the SSH key password from the password safe (if any)
+            if (connection.encodedKeyPassword != null) {
+                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+                val credentials = passwordSafe.get(credentialAttributes)
+                connection.encodedKeyPassword = credentials?.getPasswordAsString()
+            }
         }
         
         // Retrieve the actual sudo password from the password safe (if any)
@@ -138,6 +160,9 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
             val passwordCredentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, id)
             passwordSafe.set(passwordCredentialAttributes, null)
             
+            val keyPasswordCredentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, id)
+            passwordSafe.set(keyPasswordCredentialAttributes, null)
+            
             val sudoPasswordCredentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, id)
             passwordSafe.set(sudoPasswordCredentialAttributes, null)
         }
@@ -154,5 +179,34 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         decryptConnectionPasswords(connectionCopy)
         
         return connectionCopy
+    }
+    
+    /**
+     * Generates the SSH command for a connection based on its configuration.
+     * @param id The ID of the connection
+     * @return The SSH command string or null if the connection is not found
+     */
+    fun generateSshCommand(id: String): String? {
+        val connection = getConnectionWithPlainPasswords(id) ?: return null
+        
+        val sshCommand = StringBuilder("ssh ")
+        
+        // Add port if not the default port 22
+        if (connection.port != 22) {
+            sshCommand.append("-p ${connection.port} ")
+        }
+        
+        // Add key option if using SSH key authentication
+        if (connection.useKey) {
+            sshCommand.append("-i ${connection.keyPath} ")
+        }
+        
+        // Add the username and host
+        sshCommand.append("${connection.username}@${connection.host}")
+        
+        // Note: Passwords are not included in the command as they would be handled by the SSH client
+        // or through other secure methods like an agent or passphrase prompt
+        
+        return sshCommand.toString()
     }
 }

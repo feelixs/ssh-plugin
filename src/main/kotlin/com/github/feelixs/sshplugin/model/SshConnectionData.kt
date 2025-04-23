@@ -15,7 +15,10 @@ data class SshConnectionData(
     var encodedPassword: String? = null, // Placeholder for securely stored password
     @Attribute("osType") var osType: OsType = OsType.LINUX,
     @Attribute("useSudo") var useSudo: Boolean = false,
-    var encodedSudoPassword: String? = null // Placeholder for securely stored sudo password
+    var encodedSudoPassword: String? = null, // Placeholder for securely stored sudo password
+    @Attribute("useKey") var useKey: Boolean = false, // Whether to use SSH key authentication
+    @Attribute("keyPath") var keyPath: String = "", // Path to the SSH key file
+    var encodedKeyPassword: String? = null // Placeholder for securely stored key password
 ) {
     // Default constructor for XML serialization
     constructor() : this(id = java.util.UUID.randomUUID().toString())

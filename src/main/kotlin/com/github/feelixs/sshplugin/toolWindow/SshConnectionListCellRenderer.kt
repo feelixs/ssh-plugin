@@ -31,9 +31,14 @@ class SshConnectionListCellRenderer : ColoredListCellRenderer<SshConnectionData>
         // Show host and username as secondary information
         append(" (${value.username}@${value.host})", SimpleTextAttributes.GRAYED_ATTRIBUTES)
         
+        // Show authentication type
+        if (value.useKey) {
+            append(" [key]", SimpleTextAttributes.GRAY_ITALIC_ATTRIBUTES)
+        }
+        
         // Show sudo indicator if applicable
         if (value.useSudo) {
-            append(" [sudo]", SimpleTextAttributes.GRAY_ITALIC_ATTRIBUTES)
+            append(" [auto-sudo]", SimpleTextAttributes.GRAY_ITALIC_ATTRIBUTES)
         }
     }
 }

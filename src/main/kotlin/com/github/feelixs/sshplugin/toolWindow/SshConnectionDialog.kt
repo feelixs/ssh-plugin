@@ -2,8 +2,10 @@ package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
+import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
@@ -11,7 +13,9 @@ import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
+import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
+import java.awt.CardLayout
 import java.awt.Component
 import java.awt.GridLayout
 import javax.swing.*
@@ -29,17 +33,49 @@ class SshConnectionDialog(
     private val portField = JBTextField(existingConnection?.port?.toString() ?: "22", 5)
     private val usernameField = JBTextField(existingConnection?.username ?: "", 20)
     private val passwordField = JBPasswordField()
+    
+    // SSH key authentication
+    private val useKeyCheckbox = JBCheckBox("Use SSH key authentication", existingConnection?.useKey ?: false)
+    private val keyPathField = TextFieldWithBrowseButton().apply {
+        text = existingConnection?.keyPath ?: ""
+        addBrowseFolderListener(
+            "Select SSH Key",
+            "Choose the SSH key file to use for authentication",
+            project,
+            FileChooserDescriptorFactory.createSingleFileDescriptor()
+        )
+    }
+    private val keyPasswordField = JBPasswordField()
+    
+    // SSH key panel with path and passphrase fields
+    private val keyPanel = JPanel().apply {
+        layout = BoxLayout(this, BoxLayout.Y_AXIS)
+        isVisible = false  // Initially hidden
+    }
+    
+    // OS type selection
     private val linuxRadioButton = JRadioButton("Linux")
     private val windowsRadioButton = JRadioButton("Windows")
-    private val useSudoCheckbox = JBCheckBox("Use sudo", existingConnection?.useSudo ?: false)
+    
+    // Auto sudo option
+    private val useSudoCheckbox = JBCheckBox("Auto sudo (automatically escalate the session to sudo mode after logging in)", 
+        existingConnection?.useSudo ?: false)
     private val sudoPasswordField = JBPasswordField()
     
     init {
         title = if (existingConnection == null) "Add SSH Connection" else "Edit SSH Connection"
         
-        // Set the current password as a placeholder - not visible but for editing purposes
-        if (existingConnection?.encodedPassword != null) {
-            passwordField.text = existingConnection.encodedPassword
+        // Set the current password values for editing
+        if (existingConnection != null) {
+            if (!existingConnection.useKey) {
+                if (existingConnection.encodedPassword != null) {
+                    passwordField.text = existingConnection.encodedPassword
+                }
+            } else {
+                if (existingConnection.encodedKeyPassword != null) {
+                    keyPasswordField.text = existingConnection.encodedKeyPassword
+                }
+            }
         }
         
         if (existingConnection?.encodedSudoPassword != null) {
@@ -57,13 +93,76 @@ class SshConnectionDialog(
             linuxRadioButton.isSelected = true
         }
         
-        // Make sudo password field enabled only when useSudo is checked
-        sudoPasswordField.isEnabled = useSudoCheckbox.isSelected
-        useSudoCheckbox.addActionListener {
-            sudoPasswordField.isEnabled = useSudoCheckbox.isSelected
-        }
+        // Make sure sudo options are properly enabled/disabled based on initial OS selection
+        updateSudoEnabled()
+        
+        // Set up auth panel with card layout
+        setupAuthPanel()
+        
+        // Set event listeners for form controls
+        setupEventListeners()
         
         init()
+    }
+    
+    private fun setupAuthPanel() {
+        // Setup SSH Key panel
+        val keyPathLabelPanel = JPanel(BorderLayout())
+        keyPathLabelPanel.add(JBLabel("Key path:"), BorderLayout.WEST)
+        keyPathLabelPanel.border = JBUI.Borders.empty(0, 0, 5, 0)
+        
+        val keyPasswordLabelPanel = JPanel(BorderLayout())
+        keyPasswordLabelPanel.add(JBLabel("Key passphrase:"), BorderLayout.WEST)
+        
+        keyPanel.add(keyPathLabelPanel)
+        keyPanel.add(keyPathField)
+        keyPanel.add(Box.createVerticalStrut(5))
+        keyPanel.add(keyPasswordLabelPanel)
+        keyPanel.add(keyPasswordField)
+        
+        // Set initial visibility based on existing connection
+        if (existingConnection != null && existingConnection.useKey) {
+            keyPanel.isVisible = true
+            useKeyCheckbox.isSelected = true
+        } else {
+            keyPanel.isVisible = false
+            useKeyCheckbox.isSelected = false
+        }
+    }
+    
+    private fun setupEventListeners() {
+        // Toggle SSH key panel visibility
+        useKeyCheckbox.addActionListener {
+            keyPanel.isVisible = useKeyCheckbox.isSelected
+        }
+        
+        // Make sudo password field enabled only when useSudo is checked and OS is Linux
+        updateSudoEnabled()
+        
+        useSudoCheckbox.addActionListener {
+            updateSudoEnabled()
+        }
+        
+        linuxRadioButton.addActionListener {
+            updateSudoEnabled()
+        }
+        
+        windowsRadioButton.addActionListener {
+            updateSudoEnabled()
+        }
+    }
+    
+    private fun updateSudoEnabled() {
+        val isSudoAvailable = linuxRadioButton.isSelected
+        useSudoCheckbox.isEnabled = isSudoAvailable
+        
+        val isSudoEnabled = isSudoAvailable && useSudoCheckbox.isSelected
+        sudoPasswordField.isEnabled = isSudoEnabled
+        
+        if (!isSudoAvailable) {
+            useSudoCheckbox.isSelected = false
+            sudoPasswordField.isEnabled = false
+        }
     }
     
     override fun createCenterPanel(): JComponent {
@@ -77,23 +176,31 @@ class SshConnectionDialog(
         
         // Create sudo panel with checkbox and password field
         val sudoPanel = JPanel(BorderLayout())
-        sudoPanel.add(useSudoCheckbox, BorderLayout.WEST)
-        sudoPanel.add(sudoPasswordField, BorderLayout.CENTER)
+        sudoPanel.add(useSudoCheckbox, BorderLayout.NORTH)
+        
+        val sudoPasswordPanel = JPanel(BorderLayout())
+        sudoPasswordPanel.add(JBLabel("Sudo Password (if different than user password):"), BorderLayout.WEST)
+        sudoPasswordPanel.add(sudoPasswordField, BorderLayout.CENTER)
+        sudoPasswordPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
+        
+        sudoPanel.add(sudoPasswordPanel, BorderLayout.CENTER)
         
         // Main form
-        return FormBuilder.createFormBuilder()
+        val mainPanel = FormBuilder.createFormBuilder()
             .addLabeledComponent("Alias:", aliasField)
             .addLabeledComponent("Host:", hostField)
             .addLabeledComponent("Port:", portField)
             .addLabeledComponent("Username:", usernameField)
             .addLabeledComponent("Password:", passwordField)
+            .addComponent(useKeyCheckbox)
+            .addComponent(keyPanel)
             .addComponent(osTypePanel)
             .addComponent(sudoPanel)
             .addComponentFillVertically(JPanel(), 0)
             .panel
-            .apply {
-                border = JBUI.Borders.empty(10)
-            }
+        
+        mainPanel.border = JBUI.Borders.empty(10)
+        return mainPanel
     }
     
     override fun doValidate(): ValidationInfo? {
@@ -120,10 +227,12 @@ class SshConnectionDialog(
             return ValidationInfo("Port must be a valid number", portField)
         }
         
-        // Validate sudo password if sudo is enabled
-        if (useSudoCheckbox.isSelected && sudoPasswordField.password.isEmpty() && linuxRadioButton.isSelected) {
-            return ValidationInfo("Sudo password is required when sudo is enabled", sudoPasswordField)
+        // Validate SSH key path if using key authentication
+        if (useKeyCheckbox.isSelected && keyPathField.text.isBlank()) {
+            return ValidationInfo("SSH key path is required when using key authentication", keyPathField)
         }
+        
+        // We no longer require sudo password, even if sudo is enabled, as it might be the same as user password
         
         return null
     }
@@ -134,6 +243,7 @@ class SshConnectionDialog(
     fun createConnectionData(): SshConnectionData {
         val osType = if (linuxRadioButton.isSelected) OsType.LINUX else OsType.WINDOWS
         val useSudo = useSudoCheckbox.isSelected && osType == OsType.LINUX
+        val useKey = useKeyCheckbox.isSelected
         
         return SshConnectionData(
             id = existingConnection?.id ?: java.util.UUID.randomUUID().toString(),
@@ -141,10 +251,16 @@ class SshConnectionDialog(
             host = hostField.text,
             port = portField.text.toInt(),
             username = usernameField.text,
-            encodedPassword = passwordField.password.joinToString(""),
+            encodedPassword = if (!useKey) passwordField.password.joinToString("") else null,
             osType = osType,
             useSudo = useSudo,
-            encodedSudoPassword = if (useSudo) sudoPasswordField.password.joinToString("") else null
+            // Only use separate sudo password if provided (otherwise system will use user password)
+            encodedSudoPassword = if (useSudo && sudoPasswordField.password.isNotEmpty()) 
+                                    sudoPasswordField.password.joinToString("") 
+                                  else null,
+            useKey = useKey,
+            keyPath = if (useKey) keyPathField.text else "",
+            encodedKeyPassword = if (useKey) keyPasswordField.password.joinToString("") else null
         )
     }
 }

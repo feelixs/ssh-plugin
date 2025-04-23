@@ -1,6 +1,7 @@
 package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.actions.PluginDataKeys
+import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.openapi.actionSystem.*
@@ -124,8 +125,19 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     fun connect() {
         val selectedConnection = connectionList.selectedValue
         if (selectedConnection != null) {
-            // TODO: Implement connection logic (using SshInitiator or similar)
-            println("Connect action triggered for: ${selectedConnection.alias}")
+            // Get the SSH command for this connection
+            val sshCommand = connectionStorageService.generateSshCommand(selectedConnection.id)
+            
+            if (sshCommand != null) {
+                // TODO: Implement actual terminal integration
+                // For now, just print the command that would be executed
+                println("SSH command for ${selectedConnection.alias}: $sshCommand")
+                
+                // If sudo is enabled, print the sudo command that would follow
+                if (selectedConnection.osType == OsType.LINUX && selectedConnection.useSudo) {
+                    println("Auto-sudo would be executed after connection")
+                }
+            }
         }
     }
 

@@ -45,7 +45,10 @@ class MyPluginTest : BasePlatformTestCase() {
             encodedPassword = "testpassword",
             osType = OsType.LINUX,
             useSudo = true,
-            encodedSudoPassword = "sudopassword"
+            encodedSudoPassword = "sudopassword",
+            useKey = false,
+            keyPath = "",
+            encodedKeyPassword = null
         )
         
         // Add connection and verify it was added
@@ -61,6 +64,7 @@ class MyPluginTest : BasePlatformTestCase() {
         assertEquals("example.com", addedConnection?.host)
         assertEquals(22, addedConnection?.port)
         assertEquals("testuser", addedConnection?.username)
+        assertEquals(false, addedConnection?.useKey)
         
         // Passwords should be encrypted/stored securely, not accessible directly
         assertNotEquals("testpassword", addedConnection?.encodedPassword)
@@ -93,6 +97,60 @@ class MyPluginTest : BasePlatformTestCase() {
         // Verify connection with passwords can't be retrieved after removal
         val removedConnection = service.getConnectionWithPlainPasswords(connection.id)
         assertNull(removedConnection)
+    }
+    
+    fun testSshKeyConnection() {
+        val service = ApplicationManager.getApplication().getService(SshConnectionStorageService::class.java)
+        val initialSize = service.getConnections().size
+        
+        // Create a test connection with SSH key
+        val keyConnection = SshConnectionData(
+            alias = "SSH Key Connection",
+            host = "ssh.example.com",
+            port = 22,
+            username = "keyuser",
+            encodedPassword = null,
+            osType = OsType.LINUX,
+            useSudo = true,
+            encodedSudoPassword = "sudopass",
+            useKey = true,
+            keyPath = "/home/user/.ssh/id_rsa",
+            encodedKeyPassword = "keypassphrase"
+        )
+        
+        // Add connection and verify it was added
+        service.addConnection(keyConnection)
+        assertEquals(initialSize + 1, service.getConnections().size)
+        
+        // Get the added connection
+        val addedKeyConnection = service.getConnections().find { it.id == keyConnection.id }
+        assertNotNull(addedKeyConnection)
+        
+        // Verify connection details
+        assertEquals("SSH Key Connection", addedKeyConnection?.alias)
+        assertEquals("ssh.example.com", addedKeyConnection?.host)
+        assertEquals("keyuser", addedKeyConnection?.username)
+        assertEquals(true, addedKeyConnection?.useKey)
+        assertEquals("/home/user/.ssh/id_rsa", addedKeyConnection?.keyPath)
+        
+        // Passwords should be encrypted/stored securely, not accessible directly
+        assertNotEquals("keypassphrase", addedKeyConnection?.encodedKeyPassword)
+        assertNotEquals("sudopass", addedKeyConnection?.encodedSudoPassword)
+        
+        // Test getting connection with decrypted passwords
+        val connectionWithPasswords = service.getConnectionWithPlainPasswords(keyConnection.id)
+        assertNotNull(connectionWithPasswords)
+        assertEquals("keypassphrase", connectionWithPasswords?.encodedKeyPassword)
+        assertEquals("sudopass", connectionWithPasswords?.encodedSudoPassword)
+        
+        // Test the SSH command generation
+        val sshCommand = service.generateSshCommand(keyConnection.id)
+        assertNotNull(sshCommand)
+        assertEquals("ssh -i /home/user/.ssh/id_rsa keyuser@ssh.example.com", sshCommand)
+        
+        // Remove the connection and verify it was removed
+        service.removeConnection(keyConnection.id)
+        assertEquals(initialSize, service.getConnections().size)
     }
 
     override fun getTestDataPath() = "src/test/testData/rename"
