@@ -10,7 +10,7 @@ import javax.swing.Icon
 class DeleteConnectionAction : AnAction, DumbAware {
 
     // Use secondary constructor to pass the icon
-    constructor() : super(AllIcons.Actions.Delete)
+    constructor() : super(AllIcons.General.Remove)
 
     override fun actionPerformed(e: AnActionEvent) {
         val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)

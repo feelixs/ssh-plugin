@@ -10,7 +10,7 @@ import javax.swing.Icon
 class AddConnectionAction : AnAction, DumbAware {
 
     // Use secondary constructor to pass the icon
-    constructor() : super(AllIcons.Actions.Add)
+    constructor() : super(AllIcons.General.Add)
 
     override fun actionPerformed(e: AnActionEvent) {
         val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)

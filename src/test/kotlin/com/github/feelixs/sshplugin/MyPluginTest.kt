@@ -1,12 +1,13 @@
 package com.github.feelixs.sshplugin
 
+import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.ide.highlighter.XmlFileType
-import com.intellij.openapi.components.service
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.PsiErrorElementUtil
-import com.github.feelixs.sshplugin.services.MyProjectService
 
 @TestDataPath("\$CONTENT_ROOT/src/test/testData")
 class MyPluginTest : BasePlatformTestCase() {
@@ -29,10 +30,19 @@ class MyPluginTest : BasePlatformTestCase() {
         myFixture.testRename("foo.xml", "foo_after.xml", "a2")
     }
 
-    fun testProjectService() {
-        val projectService = project.service<MyProjectService>()
-
-        assertNotSame(projectService.getRandomNumber(), projectService.getRandomNumber())
+    fun testSshConnectionService() {
+        val service = ApplicationManager.getApplication().getService(SshConnectionStorageService::class.java)
+        val initialSize = service.getConnections().size
+        
+        // Add a connection and verify it was added
+        val connection = SshConnectionData(alias = "Test Connection", host = "localhost")
+        service.addConnection(connection)
+        
+        assertEquals(initialSize + 1, service.getConnections().size)
+        
+        // Remove the connection and verify it was removed
+        service.removeConnection(connection.id)
+        assertEquals(initialSize, service.getConnections().size)
     }
 
     override fun getTestDataPath() = "src/test/testData/rename"
