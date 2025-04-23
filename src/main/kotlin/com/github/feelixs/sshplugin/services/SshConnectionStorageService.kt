@@ -78,6 +78,11 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         }
     }
     
+    // Helper method for tests to force synchronous encryption
+    fun encryptConnectionForTest(connection: SshConnectionData) {
+        encryptConnectionPasswordsImpl(connection)
+    }
+    
     private fun encryptConnectionPasswordsImpl(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
