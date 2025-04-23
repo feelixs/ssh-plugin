@@ -9,7 +9,15 @@
     <resource-bundle>messages.MyBundle</resource-bundle>
 
     <extensions defaultExtensionNs="com.intellij">
-        <toolWindow factoryClass="com.github.feelixs.sshplugin.toolWindow.MyToolWindowFactory" id="MyToolWindow"/>
-        <postStartupActivity implementation="com.github.feelixs.sshplugin.startup.MyProjectActivity" />
+        <!-- Register the application-level service for storing connections -->
+        <applicationService serviceImplementation="com.github.feelixs.sshplugin.services.SshConnectionStorageService"/>
+
+        <!-- Define the tool window -->
+        <toolWindow
+                id="SSH Connections"
+                anchor="left"
+                icon="AllIcons.Nodes.KeymapTools"
+                factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
+        <!-- Removed postStartupActivity -->
     </extensions>
 </idea-plugin>
