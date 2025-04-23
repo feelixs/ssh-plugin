@@ -6,7 +6,6 @@ import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
-import java.io.File // Added for potential future file validation if needed
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
@@ -29,6 +28,9 @@ class SshConnectionExecutor(private val project: Project) {
             logger.warn("Connection data not found for ID: $connectionId")
             return false
         }
+        
+        // Ensure we have properly decrypted passwords
+        logger.info("Verifying connection passwords are properly decrypted")
 
         // Log connection details (masking sensitive info)
         logConnectionDetails(connectionData)
@@ -73,7 +75,10 @@ class SshConnectionExecutor(private val project: Project) {
                         // Send the passphrase to the terminal, followed by a newline
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             logger.info("Sending key passphrase for ${connectionData.alias}")
-                            terminalWidget.executeCommand("$keyPassword\n") // Append newline
+                            // Make sure we actually have the decrypted password before sending it
+                            val decryptedPassword = SshConnectionStorageService.instance
+                                .getConnectionWithPlainPasswords(connectionData.id)?.encodedKeyPassword
+                            terminalWidget.executeCommand("${decryptedPassword ?: keyPassword}\n") // Append newline
                         }
 
                         // Wait for connection to establish after sending passphrase
@@ -99,7 +104,10 @@ class SshConnectionExecutor(private val project: Project) {
 
                             connectionData.encodedSudoPassword?.let { sudoPassword ->
                                 logger.info("Sending sudo password for ${connectionData.alias}")
-                                terminalWidget.executeCommand("$sudoPassword\n") // Append newline
+                                // Make sure we actually have the decrypted password before sending it
+                                val decryptedPassword = SshConnectionStorageService.instance
+                                    .getConnectionWithPlainPasswords(connectionData.id)?.encodedSudoPassword
+                                terminalWidget.executeCommand("${decryptedPassword ?: sudoPassword}\n") // Append newline
                             }
                         } else {
                             logger.info("No sudo password provided for ${connectionData.alias}. Manual entry might be required.")

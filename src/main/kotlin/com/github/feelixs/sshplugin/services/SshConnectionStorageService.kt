@@ -66,67 +66,73 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     // --- Password encryption/decryption ---
 
     private fun encryptConnectionPasswords(connection: SshConnectionData) {
-        // Store the actual passwords in the password safe
-        val passwordSafe = PasswordSafe.instance
-        
-        if (!connection.useKey) {
-            // Store current plaintext password in the password safe (if any)
-            connection.encodedPassword?.let { plainPassword ->
-                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-                val credentials = Credentials("", plainPassword)
-                passwordSafe.set(credentialAttributes, credentials)
-                
-                // Clear the plaintext password and set a marker
-                connection.encodedPassword = UUID.randomUUID().toString()
-            }
-        } else {
-            // Store SSH key password in the password safe (if any)
-            connection.encodedKeyPassword?.let { plainKeyPassword ->
-                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
-                val credentials = Credentials("", plainKeyPassword)
-                passwordSafe.set(credentialAttributes, credentials)
-                
-                // Clear the plaintext password and set a marker
-                connection.encodedKeyPassword = UUID.randomUUID().toString()
-            }
-        }
-        
-        // Store current plaintext sudo password in the password safe (if any)
-        connection.encodedSudoPassword?.let { plainSudoPassword ->
-            val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
-            val credentials = Credentials("", plainSudoPassword)
-            passwordSafe.set(credentialAttributes, credentials)
+        // Store the actual passwords in the password safe - use application manager to run outside of read action
+        ApplicationManager.getApplication().invokeLater {
+            val passwordSafe = PasswordSafe.instance
             
-            // Clear the plaintext password and set a marker
-            connection.encodedSudoPassword = UUID.randomUUID().toString()
+            if (!connection.useKey) {
+                // Store current plaintext password in the password safe (if any)
+                connection.encodedPassword?.let { plainPassword ->
+                    val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+                    val credentials = Credentials("", plainPassword)
+                    passwordSafe.set(credentialAttributes, credentials)
+                    
+                    // Clear the plaintext password and set a marker
+                    connection.encodedPassword = UUID.randomUUID().toString()
+                }
+            } else {
+                // Store SSH key password in the password safe (if any)
+                connection.encodedKeyPassword?.let { plainKeyPassword ->
+                    val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+                    val credentials = Credentials("", plainKeyPassword)
+                    passwordSafe.set(credentialAttributes, credentials)
+                    
+                    // Clear the plaintext password and set a marker
+                    connection.encodedKeyPassword = UUID.randomUUID().toString()
+                }
+            }
+            
+            // Store current plaintext sudo password in the password safe (if any)
+            connection.encodedSudoPassword?.let { plainSudoPassword ->
+                val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
+                val credentials = Credentials("", plainSudoPassword)
+                passwordSafe.set(credentialAttributes, credentials)
+                
+                // Clear the plaintext password and set a marker
+                connection.encodedSudoPassword = UUID.randomUUID().toString()
+            }
         }
     }
 
     private fun decryptConnectionPasswords(connection: SshConnectionData) {
-        val passwordSafe = PasswordSafe.instance
-        
-        if (!connection.useKey) {
-            // Retrieve the actual password from the password safe (if any)
-            if (connection.encodedPassword != null) {
-                val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
-                val credentials = passwordSafe.get(credentialAttributes)
-                connection.encodedPassword = credentials?.getPasswordAsString()
+        // Use runBlocking to wait for the password safe operation which could be slow
+        // This is safer to use in decryption since we need the decrypted values immediately
+        com.intellij.openapi.application.ApplicationManager.getApplication().executeOnPooledThread {
+            val passwordSafe = PasswordSafe.instance
+            
+            if (!connection.useKey) {
+                // Retrieve the actual password from the password safe (if any)
+                if (connection.encodedPassword != null) {
+                    val credentialAttributes = createCredentialAttributes(PASSWORD_KEY_PREFIX, connection.id)
+                    val credentials = passwordSafe.get(credentialAttributes)
+                    connection.encodedPassword = credentials?.getPasswordAsString()
+                }
+            } else {
+                // Retrieve the SSH key password from the password safe (if any)
+                if (connection.encodedKeyPassword != null) {
+                    val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+                    val credentials = passwordSafe.get(credentialAttributes)
+                    connection.encodedKeyPassword = credentials?.getPasswordAsString()
+                }
             }
-        } else {
-            // Retrieve the SSH key password from the password safe (if any)
-            if (connection.encodedKeyPassword != null) {
-                val credentialAttributes = createCredentialAttributes(KEY_PASSWORD_PREFIX, connection.id)
+            
+            // Retrieve the actual sudo password from the password safe (if any)
+            if (connection.encodedSudoPassword != null) {
+                val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
                 val credentials = passwordSafe.get(credentialAttributes)
-                connection.encodedKeyPassword = credentials?.getPasswordAsString()
+                connection.encodedSudoPassword = credentials?.getPasswordAsString()
             }
-        }
-        
-        // Retrieve the actual sudo password from the password safe (if any)
-        if (connection.encodedSudoPassword != null) {
-            val credentialAttributes = createCredentialAttributes(SUDO_PASSWORD_KEY_PREFIX, connection.id)
-            val credentials = passwordSafe.get(credentialAttributes)
-            connection.encodedSudoPassword = credentials?.getPasswordAsString()
-        }
+        }.get() // Wait for the thread to complete
     }
 
     // --- Public API for managing connections ---
@@ -172,13 +178,27 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     
     // Method to get the actual passwords for use in SSH connections
     fun getConnectionWithPlainPasswords(id: String): SshConnectionData? {
-        val connection = internalState.connections.find { it.id == id } ?: return null
-        
-        // Make a copy to avoid modifying the stored connection
-        val connectionCopy = connection.copy()
-        decryptConnectionPasswords(connectionCopy)
-        
-        return connectionCopy
+        // Make sure we're not in a read action by using executeOnPooledThread if needed
+        if (ApplicationManager.getApplication().isReadAccessAllowed) {
+            return ApplicationManager.getApplication().executeOnPooledThread<SshConnectionData?> {
+                // Find connection outside of read action
+                val connection = internalState.connections.find { it.id == id } ?: return@executeOnPooledThread null
+                
+                // Make a copy to avoid modifying the stored connection
+                val connectionCopy = connection.copy()
+                decryptConnectionPasswords(connectionCopy)
+                
+                return@executeOnPooledThread connectionCopy
+            }.get()
+        } else {
+            val connection = internalState.connections.find { it.id == id } ?: return null
+            
+            // Make a copy to avoid modifying the stored connection
+            val connectionCopy = connection.copy()
+            decryptConnectionPasswords(connectionCopy)
+            
+            return connectionCopy
+        }
     }
     
     /**
@@ -187,27 +207,52 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
      * @return The SSH command string or null if the connection is not found
      */
     fun generateSshCommand(id: String): String? {
-        val connection = getConnectionWithPlainPasswords(id) ?: return null
-        
-        val sshCommand = StringBuilder("ssh ")
-        
-        // Add port if not the default port 22
-        if (connection.port != 22) {
-            sshCommand.append("-p ${connection.port} ")
+        // Check if we're in a read action and handle appropriately
+        if (ApplicationManager.getApplication().isReadAccessAllowed) {
+            return ApplicationManager.getApplication().executeOnPooledThread<String?> {
+                val connection = getConnectionWithPlainPasswords(id) ?: return@executeOnPooledThread null
+                
+                val sshCommand = StringBuilder("ssh ")
+                
+                // Add port if not the default port 22
+                if (connection.port != 22) {
+                    sshCommand.append("-p ${connection.port} ")
+                }
+                
+                // Add key option if using SSH key authentication
+                if (connection.useKey) {
+                    // Use the SSH key for authentication
+                    sshCommand.append("-i ${connection.keyPath} ")
+                }
+                
+                // Add the username and host
+                sshCommand.append("${connection.username}@${connection.host}")
+                
+                return@executeOnPooledThread sshCommand.toString()
+            }.get()
+        } else {
+            val connection = getConnectionWithPlainPasswords(id) ?: return null
+            
+            val sshCommand = StringBuilder("ssh ")
+            
+            // Add port if not the default port 22
+            if (connection.port != 22) {
+                sshCommand.append("-p ${connection.port} ")
+            }
+            
+            // Add key option if using SSH key authentication
+            if (connection.useKey) {
+                // Use the SSH key for authentication
+                sshCommand.append("-i ${connection.keyPath} ")
+            }
+            
+            // Add the username and host
+            sshCommand.append("${connection.username}@${connection.host}")
+            
+            // Note: Passwords are not included in the command as they would be handled by the SSH client
+            // or through other secure methods like an agent or passphrase prompt
+            
+            return sshCommand.toString()
         }
-        
-        // Add key option if using SSH key authentication
-        if (connection.useKey) {
-            // Use the SSH key for authentication
-            sshCommand.append("-i ${connection.keyPath} ")
-        }
-        
-        // Add the username and host
-        sshCommand.append("${connection.username}@${connection.host}")
-        
-        // Note: Passwords are not included in the command as they would be handled by the SSH client
-        // or through other secure methods like an agent or passphrase prompt
-        
-        return sshCommand.toString()
     }
 }
