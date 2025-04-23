@@ -198,6 +198,7 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         
         // Add key option if using SSH key authentication
         if (connection.useKey) {
+            // Use the SSH key for authentication
             sshCommand.append("-i ${connection.keyPath} ")
         }
         
