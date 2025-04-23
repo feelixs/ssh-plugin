@@ -1,5 +1,6 @@
 package com.github.feelixs.sshplugin
 
+import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.ide.highlighter.XmlFileType
@@ -8,6 +9,7 @@ import com.intellij.psi.xml.XmlFile
 import com.intellij.testFramework.TestDataPath
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import com.intellij.util.PsiErrorElementUtil
+import org.junit.Assert.assertNotEquals
 
 @TestDataPath("\$CONTENT_ROOT/src/test/testData")
 class MyPluginTest : BasePlatformTestCase() {
@@ -34,15 +36,63 @@ class MyPluginTest : BasePlatformTestCase() {
         val service = ApplicationManager.getApplication().getService(SshConnectionStorageService::class.java)
         val initialSize = service.getConnections().size
         
-        // Add a connection and verify it was added
-        val connection = SshConnectionData(alias = "Test Connection", host = "localhost")
-        service.addConnection(connection)
+        // Create a test connection with passwords
+        val connection = SshConnectionData(
+            alias = "Test Connection",
+            host = "example.com",
+            port = 22,
+            username = "testuser",
+            encodedPassword = "testpassword",
+            osType = OsType.LINUX,
+            useSudo = true,
+            encodedSudoPassword = "sudopassword"
+        )
         
+        // Add connection and verify it was added
+        service.addConnection(connection)
         assertEquals(initialSize + 1, service.getConnections().size)
+        
+        // Get the added connection
+        val addedConnection = service.getConnections().find { it.id == connection.id }
+        assertNotNull(addedConnection)
+        
+        // Verify connection details
+        assertEquals("Test Connection", addedConnection?.alias)
+        assertEquals("example.com", addedConnection?.host)
+        assertEquals(22, addedConnection?.port)
+        assertEquals("testuser", addedConnection?.username)
+        
+        // Passwords should be encrypted/stored securely, not accessible directly
+        assertNotEquals("testpassword", addedConnection?.encodedPassword)
+        assertNotEquals("sudopassword", addedConnection?.encodedSudoPassword)
+        
+        // Test getting connection with decrypted passwords
+        val connectionWithPasswords = service.getConnectionWithPlainPasswords(connection.id)
+        assertNotNull(connectionWithPasswords)
+        assertEquals("testpassword", connectionWithPasswords?.encodedPassword)
+        assertEquals("sudopassword", connectionWithPasswords?.encodedSudoPassword)
+        
+        // Test updating a connection with new passwords
+        val updatedConnection = connection.copy(
+            alias = "Updated Connection",
+            encodedPassword = "newpassword",
+            encodedSudoPassword = "newsudopassword"
+        )
+        service.updateConnection(updatedConnection)
+        
+        // Get updated connection with passwords
+        val updatedWithPasswords = service.getConnectionWithPlainPasswords(connection.id)
+        assertEquals("Updated Connection", updatedWithPasswords?.alias)
+        assertEquals("newpassword", updatedWithPasswords?.encodedPassword)
+        assertEquals("newsudopassword", updatedWithPasswords?.encodedSudoPassword)
         
         // Remove the connection and verify it was removed
         service.removeConnection(connection.id)
         assertEquals(initialSize, service.getConnections().size)
+        
+        // Verify connection with passwords can't be retrieved after removal
+        val removedConnection = service.getConnectionWithPlainPasswords(connection.id)
+        assertNull(removedConnection)
     }
 
     override fun getTestDataPath() = "src/test/testData/rename"
