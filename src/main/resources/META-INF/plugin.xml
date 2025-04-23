@@ -18,6 +18,30 @@
                 anchor="left"
                 icon="AllIcons.Nodes.KeymapTools"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
-        <!-- Removed postStartupActivity -->
     </extensions>
+
+    <!-- Define actions and groups -->
+    <actions>
+        <group id="SSHPlugin.ToolWindow.Toolbar" popup="false">
+            <action id="SSHPlugin.AddConnection"
+                    class="com.github.feelixs.sshplugin.actions.AddConnectionAction"
+                    text="Add Connection"
+                    description="Add a new SSH connection configuration"/>
+            <action id="SSHPlugin.EditConnection"
+                    class="com.github.feelixs.sshplugin.actions.EditConnectionAction"
+                    text="Edit Connection"
+                    description="Edit the selected SSH connection configuration"/>
+            <action id="SSHPlugin.DeleteConnection"
+                    class="com.github.feelixs.sshplugin.actions.DeleteConnectionAction"
+                    text="Delete Connection"
+                    description="Delete the selected SSH connection configuration"/>
+            <separator/>
+            <action id="SSHPlugin.Connect"
+                    class="com.github.feelixs.sshplugin.actions.ConnectAction"
+                    text="Connect"
+                    description="Connect using the selected SSH configuration"/>
+            <add-to-group group-id="ToolsMenu" anchor="last"/> <!-- Example: Add group to Tools menu -->
+        </group>
+    </actions>
+
 </idea-plugin>
