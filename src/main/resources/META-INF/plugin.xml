@@ -15,8 +15,8 @@
         <!-- Define the tool window -->
         <toolWindow
                 id="SSH Connections"
-                anchor="left"
-                icon="AllIcons.Nodes.KeymapTools"
+                anchor="bottom"
+                icon="AllIcons.Expui.WebReferences.Server"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
     </extensions>
 
