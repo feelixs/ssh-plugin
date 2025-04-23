@@ -1,12 +1,12 @@
 package com.github.feelixs.sshplugin.actions
 
-import com.intellij.icons.AllIcons // Import AllIcons
+import com.intellij.icons.AllIcons // Ensure AllIcons is imported
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAware
 
 // Action to add a new SSH connection configuration.
-class AddConnectionAction : AnAction(AllIcons.Actions.Add), DumbAware { // Use AllIcons.Actions.Add
+class AddConnectionAction : AnAction(AllIcons.Actions.Add), DumbAware { // Correct usage
 
     override fun actionPerformed(e: AnActionEvent) {
         val panel = e.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
