@@ -48,10 +48,8 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     override fun getState(): State {
-        // Encrypt passwords before persisting state
-        for (connection in internalState.connections) {
-            encryptConnectionPasswords(connection)
-        }
+        // Don't encrypt passwords in getState() as it runs in a read action
+        // Just return the state as-is - passwords should be encrypted when adding/updating
         return internalState
     }
 
@@ -66,7 +64,20 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     // --- Password encryption/decryption ---
 
     private fun encryptConnectionPasswords(connection: SshConnectionData) {
-        // Immediately encrypt passwords to ensure it works in test mode
+        // Run outside of read action to avoid SlowOperations error
+        val app = ApplicationManager.getApplication()
+        
+        // If we're in a read action, use invokeLater to queue this operation
+        if (app.isReadAccessAllowed) {
+            app.invokeLater {
+                encryptConnectionPasswordsImpl(connection)
+            }
+        } else {
+            encryptConnectionPasswordsImpl(connection)
+        }
+    }
+    
+    private fun encryptConnectionPasswordsImpl(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
         if (!connection.useKey) {
@@ -107,7 +118,20 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     private fun decryptConnectionPasswords(connection: SshConnectionData) {
-        // Handle decryption in the calling thread for consistency and test reliability
+        // Run outside of read action to avoid SlowOperations error
+        val app = ApplicationManager.getApplication()
+        
+        // If we're in a read action, use executeOnPooledThread
+        if (app.isReadAccessAllowed) {
+            app.executeOnPooledThread {
+                decryptConnectionPasswordsImpl(connection)
+            }.get() // wait for completion
+        } else {
+            decryptConnectionPasswordsImpl(connection)
+        }
+    }
+    
+    private fun decryptConnectionPasswordsImpl(connection: SshConnectionData) {
         val passwordSafe = PasswordSafe.instance
         
         if (!connection.useKey) {
