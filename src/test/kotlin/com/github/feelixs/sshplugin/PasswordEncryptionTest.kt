@@ -1,5 +1,7 @@
 package com.github.feelixs.sshplugin
 
+import com.github.feelixs.sshplugin.model.OsType
+import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.testFramework.fixtures.BasePlatformTestCase
 import org.junit.Test
@@ -39,5 +41,3 @@ class PasswordEncryptionTest : BasePlatformTestCase() {
         service.removeConnection(testConnection.id)
     }
 }
-import com.github.feelixs.sshplugin.model.OsType
-import com.github.feelixs.sshplugin.model.SshConnectionData
