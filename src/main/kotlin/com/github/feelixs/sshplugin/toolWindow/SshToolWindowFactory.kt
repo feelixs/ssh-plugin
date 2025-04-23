@@ -1,7 +1,6 @@
 package com.github.feelixs.sshplugin.toolWindow
 
-import com.intellij.openapi.project.Project
-import com.intellij.openapi.wm.ToolWindow
+// Remove duplicate imports
 import com.intellij.openapi.project.DumbAware
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindow
