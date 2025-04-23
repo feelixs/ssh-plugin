@@ -1,6 +1,7 @@
 package com.github.feelixs.sshplugin.actions
 
 import com.intellij.icons.AllIcons
+import com.intellij.openapi.actionSystem.ActionUpdateThread
 import com.intellij.openapi.actionSystem.AnAction
 import com.intellij.openapi.actionSystem.AnActionEvent
 import com.intellij.openapi.project.DumbAware
@@ -19,5 +20,9 @@ class EditConnectionAction : AnAction(AllIcons.Actions.Edit), DumbAware {
         val panel = dataContext.getData(PluginDataKeys.SSH_TOOL_WINDOW_PANEL)
         val selectedConnection = dataContext.getData(PluginDataKeys.SELECTED_SSH_CONNECTION)
         e.presentation.isEnabled = panel != null && selectedConnection != null
+    }
+
+    override fun getActionUpdateThread(): ActionUpdateThread {
+        return ActionUpdateThread.EDT
     }
 }
