@@ -4,8 +4,7 @@ import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
-import com.intellij.terminal.JBTerminalWidget
-import com.intellij.terminal.TerminalView
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 
 /**
@@ -45,9 +44,9 @@ class SshConnectionExecutor(private val project: Project) {
         logger.info("Generated SSH command for ${connectionData.alias}: $sshCommand")
 
         // Create a terminal tab for the connection
-        val terminalView = TerminalView.getInstance(project)
+        val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
-        val terminal = terminalView.createLocalShellWidget(project.basePath ?: "", tabName) as? ShellTerminalWidget
+        val terminal = terminalManager.createLocalShellWidget(project.basePath ?: "", tabName) as? ShellTerminalWidget
         
         if (terminal == null) {
             logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
@@ -134,7 +133,7 @@ class SshConnectionExecutor(private val project: Project) {
         logger.info("  OS Type: ${connection.osType}")
         logger.info("  Use Key: ${connection.useKey}")
         if (connection.useKey) {
-            logger.info("  Key Path: ${connection.keyPath ?: "Not set"}")
+            logger.info("  Key Path: ${connection.keyPath}")
             // Log if passphrase *exists* but not the passphrase itself
             logger.info("  Key Passphrase Provided: ${!connection.encodedKeyPassword.isNullOrBlank()}")
         } else {

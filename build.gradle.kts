@@ -42,8 +42,7 @@ dependencies {
         // Explicitly include required terminal plugins
         bundledPlugins(
             listOf(
-                "org.jetbrains.plugins.terminal",
-                "com.intellij.terminal"
+                "org.jetbrains.plugins.terminal"
             )
         )
 
