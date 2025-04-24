@@ -19,6 +19,11 @@
                 anchor="bottom"
                 icon="icons/cloud.svg"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
+                
+        <!-- Notification group for plugin -->
+        <notificationGroup id="SSH Plugin Notifications"
+                           displayType="BALLOON"
+                           toolWindowId="SSH Connections"/>
     </extensions>
 
     <!-- Define actions and groups -->
