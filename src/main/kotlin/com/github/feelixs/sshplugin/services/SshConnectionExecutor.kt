@@ -19,43 +19,66 @@ import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 @Service
 class SshConnectionExecutor(private val project: Project) {
 
-    // Map of connection IDs to their terminal widgets
-    private val terminalMap = mutableMapOf<String, TerminalWidget>()
+    // Map of connection IDs to their terminal widgets (supporting multiple terminals per connection)
+    private val terminalMap = mutableMapOf<String, MutableList<TerminalWidget>>()
     private val logger = thisLogger()
 
     /**
-     * Gets the terminal instance for a specific connection ID
+     * Gets the first/primary terminal instance for a specific connection ID
      * 
      * @param connectionId The ID of the connection to get the terminal for.
      *                     If null, returns the most recently used terminal.
-     * @return The terminal widget for the specified connection or null if not found
+     * @return The primary terminal widget for the specified connection or null if not found
      */
     fun getTerminal(connectionId: String? = null): TerminalWidget? {
         return if (connectionId != null) {
-            terminalMap[connectionId]
+            terminalMap[connectionId]?.firstOrNull()
         } else {
-            // If no specific ID is provided, return the most recently used terminal (if any)
-            terminalMap.values.lastOrNull()
+            // If no specific ID is provided, return the first terminal of the most recently used connection
+            terminalMap.values.lastOrNull()?.firstOrNull()
         }
+    }
+    
+    /**
+     * Gets all terminal instances for a specific connection ID
+     * 
+     * @param connectionId The ID of the connection to get terminals for
+     * @return List of terminal widgets for the connection or empty list if none found
+     */
+    fun getAllTerminalsForConnection(connectionId: String): List<TerminalWidget> {
+        return terminalMap[connectionId] ?: emptyList()
     }
     
     /**
      * Gets all active terminal instances
      * 
-     * @return Map of connection IDs to terminal widgets
+     * @return Map of connection IDs to lists of terminal widgets
      */
-    fun getAllTerminals(): Map<String, TerminalWidget> {
+    fun getAllTerminals(): Map<String, List<TerminalWidget>> {
         return terminalMap.toMap()
     }
     
     /**
-     * Removes a terminal from the map when it's closed or disconnected
+     * Counts the number of active terminals for a connection
      * 
-     * @param connectionId The ID of the connection to remove
+     * @param connectionId The ID of the connection to count terminals for
+     * @return The number of active terminals
      */
-    fun removeTerminal(connectionId: String) {
+    fun getTerminalCount(connectionId: String): Int {
+        return terminalMap[connectionId]?.size ?: 0
+    }
+    
+    /**
+     * Removes all terminals for a connection from the map
+     * 
+     * @param connectionId The ID of the connection to remove terminals for
+     * @return The number of terminals that were removed
+     */
+    fun removeAllTerminals(connectionId: String): Int {
+        val count = terminalMap[connectionId]?.size ?: 0
         terminalMap.remove(connectionId)
-        println("Removed terminal for connection ID: $connectionId")
+        println("Removed $count terminals for connection ID: $connectionId")
+        return count
     }
 
 
@@ -94,7 +117,7 @@ class SshConnectionExecutor(private val project: Project) {
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
         
         // Store terminal in the map with the connection ID
-        terminalMap[connectionId] = terminal
+        terminalMap.getOrPut(connectionId) { mutableListOf() }.add(terminal)
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)

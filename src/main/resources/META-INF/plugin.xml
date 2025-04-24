@@ -55,8 +55,8 @@
                     description="Connect using the selected SSH configuration"/>
             <action id="SSHPlugin.Disconnect"
                     class="com.github.feelixs.sshplugin.actions.DisconnectAction"
-                    text="End Session"
-                    description="Forcefully disconnect the session"/>
+                    text="Disconnect"
+                    description="Forcefully disconnect active session(s) for the selected connection"/>
             <separator/>
             <action id="SSHPlugin.CopySudoPassword"
                     class="com.github.feelixs.sshplugin.actions.CopySudoPasswordAction"
