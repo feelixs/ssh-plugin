@@ -5,26 +5,46 @@ import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
+import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
 import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.util.ui.update.MergingUpdateQueue
+import com.intellij.util.ui.update.Update
+import java.util.Timer
+import java.util.TimerTask
 import javax.swing.DefaultListModel
 import javax.swing.ListSelectionModel
 
 // Represents the main panel content for the SSH Connections tool window.
 // Implements DataProvider to supply context to actions.
-class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(true, true), DataProvider {
+class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(true, true), DataProvider, Disposable {
 
     private val connectionStorageService = SshConnectionStorageService.instance
     private val listModel = DefaultListModel<SshConnectionData>()
     private val connectionList = JBList(listModel)
+    
+    // Timer to refresh connection list status
+    private val refreshTimer = Timer("SSH-Connection-Status-Timer", true)
+    
+    // Update queue to avoid too many UI refreshes
+    private val updateQueue = MergingUpdateQueue(
+        "SshConnectionListRefresh",
+        300, // merge updates within 300ms
+        true,
+        null,
+        this,
+        null,
+        false
+    )
 
     init {
         setupUI()
         loadConnections()
+        startStatusRefreshTimer()
     }
 
     private fun setupUI() {
@@ -170,6 +190,40 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
                 }
             }
         }
+    }
+
+    /**
+     * Starts a timer to refresh the connection list status every few seconds
+     * This ensures the asterisk indicators for active connections stay current
+     */
+    private fun startStatusRefreshTimer() {
+        // Schedule a timer task to refresh the connection list every 2 seconds
+        refreshTimer.schedule(object : TimerTask() {
+            override fun run() {
+                // Use update queue to avoid flooding UI thread
+                // Queue update on UI thread
+                updateQueue.queue(Update.create("refresh") {
+                    try {
+                        // Only repaint the list if component is still valid
+                        if (connectionList.isShowing && connectionList.isValid) {
+                            connectionList.repaint()
+                        }
+                    } catch (e: Exception) {
+                        // Ignore exceptions that might occur during shutdown
+                        refreshTimer.cancel()
+                    }
+                })
+            }
+        }, 2000, 2000) // Initial delay 2 sec, then every 2 sec
+    }
+    
+    /**
+     * Clean up resources when panel is disposed
+     */
+    override fun dispose() {
+        // Cancel timer to prevent memory leaks
+        refreshTimer.cancel()
+        updateQueue.cancelAllUpdates()
     }
 
     // --- DataProvider Implementation ---

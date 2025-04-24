@@ -20,6 +20,7 @@ class SshToolWindowFactory : ToolWindowFactory, DumbAware {
 
         // Create content and add it to the tool window
         val content = contentFactory.createContent(sshToolWindowPanel, "", false) // Title is set in plugin.xml
+        content.setDisposer(sshToolWindowPanel) // Register for proper cleanup
         toolWindow.contentManager.addContent(content)
     }
 }
