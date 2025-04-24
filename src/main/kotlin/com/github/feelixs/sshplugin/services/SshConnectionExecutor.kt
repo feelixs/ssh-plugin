@@ -12,6 +12,13 @@ import org.jetbrains.plugins.terminal.ShellTerminalWidget
  */
 class SshConnectionExecutor(private val project: Project) {
 
+    // States for tracking the authentication flow
+    private enum class AuthState {
+        NOT_STARTED,  // Process hasn't started yet
+        WAITING,      // Waiting for prompt or user input
+        COMPLETED     // Process has completed successfully
+    }
+
     private val logger = thisLogger()
 
     /**
@@ -61,60 +68,128 @@ class SshConnectionExecutor(private val project: Project) {
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
             (connectionData.osType == OsType.LINUX && connectionData.useSudo)) {
             
-            logger.info("Starting background thread for potential passphrase/sudo handling for ${connectionData.alias}")
+            logger.info("Starting background thread for intelligent password automation for ${connectionData.alias}")
+            
             // Create a separate thread for handling interactive prompts
             Thread {
                 try {
-                    // When using SSH key, we may need to handle the passphrase prompt
-                    if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) {
-                        logger.info("SSH key requires passphrase for ${connectionData.alias}. Waiting for prompt...")
-                        Thread.sleep(3000)
-
-                        // Send the passphrase to the terminal, followed by a newline
-                        connectionData.encodedKeyPassword?.let { keyPassword ->
-                            logger.info("Sending key passphrase for ${connectionData.alias}")
-                            // Use password already in connectionData - no need to re-decrypt
-                            terminal.executeCommand("$keyPassword\n") // Append newline
+                    // Track states for each authentication step
+                    var keyPassphraseState = if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) 
+                                             AuthState.WAITING else AuthState.COMPLETED
+                    var sudoState = if (connectionData.osType == OsType.LINUX && connectionData.useSudo) 
+                                   AuthState.NOT_STARTED else AuthState.COMPLETED
+                    
+                    // Set timeouts to avoid infinite waiting
+                    val startTime = System.currentTimeMillis()
+                    val maxWaitTime = 15000L // 15 seconds
+                    val pollInterval = 250L // Check every 250ms
+                    
+                    // Keywords to detect in terminal for key passphrase prompt
+                    val keyPassphrasePromptPatterns = listOf(
+                        "Enter passphrase",
+                        "Key passphrase:",
+                        "password:",
+                        "passphrase for key"
+                    ).map { it.lowercase() }
+                    
+                    // Keywords to detect in terminal for shell prompt (indicating successful connection)
+                    val shellPromptPatterns = listOf(
+                        "$ ",
+                        "# ",
+                        "> ",
+                        "~]$ "
+                    )
+                    
+                    // Keywords to detect in terminal for sudo password prompt
+                    val sudoPasswordPromptPatterns = listOf(
+                        "[sudo] password",
+                        "password for",
+                        "password:"
+                    ).map { it.lowercase() }
+                    
+                    while (System.currentTimeMillis() - startTime < maxWaitTime &&
+                           (keyPassphraseState != AuthState.COMPLETED || sudoState != AuthState.COMPLETED)) {
+                        
+                        // Handle key passphrase if needed
+                        if (keyPassphraseState == AuthState.WAITING) {
+                            // Get terminal title and visible lines to check for passphrase prompt
+                            val visibleTerminalText = (terminal.terminalTitle ?: "").lowercase()
+                            
+                            // Check if any passphrase patterns match the terminal text
+                            val passphrasePromptDetected = keyPassphrasePromptPatterns.any { 
+                                visibleTerminalText.contains(it) 
+                            }
+                            
+                            if (passphrasePromptDetected) {
+                                logger.info("Detected key passphrase prompt for ${connectionData.alias}")
+                                connectionData.encodedKeyPassword?.let { keyPassword ->
+                                    logger.info("Sending key passphrase")
+                                    terminal.executeCommand("$keyPassword\n")
+                                    keyPassphraseState = AuthState.COMPLETED
+                                }
+                            }
                         }
-
-                        // Wait for connection to establish after sending passphrase
-                        logger.info("Waiting for connection to establish after passphrase for ${connectionData.alias}")
-                        Thread.sleep(2000) // Adjust timing if needed
+                        
+                        // Handle sudo command and password if needed
+                        if (keyPassphraseState == AuthState.COMPLETED && sudoState != AuthState.COMPLETED) {
+                            // If sudo not started yet, wait for shell prompt then send sudo command
+                            if (sudoState == AuthState.NOT_STARTED) {
+                                val terminalText = terminal.terminalTitle ?: ""
+                                
+                                // Check if shell prompt is detected (connection established)
+                                val shellPromptDetected = shellPromptPatterns.any { 
+                                    terminalText.contains(it) 
+                                }
+                                
+                                if (shellPromptDetected) {
+                                    logger.info("Detected shell prompt, running sudo command for ${connectionData.alias}")
+                                    terminal.executeCommand("sudo -s\n")
+                                    sudoState = AuthState.WAITING
+                                    // Reset timer to give enough time for sudo prompt
+                                    Thread.sleep(500)
+                                }
+                            } 
+                            // If sudo command sent but password not yet entered
+                            else if (sudoState == AuthState.WAITING) {
+                                val terminalText = terminal.terminalTitle ?: "".lowercase()
+                                
+                                // Check for sudo password prompt
+                                val sudoPromptDetected = sudoPasswordPromptPatterns.any { 
+                                    terminalText.contains(it)
+                                }
+                                
+                                if (sudoPromptDetected) {
+                                    logger.info("Detected sudo password prompt for ${connectionData.alias}")
+                                    
+                                    // Use sudo password if available, otherwise fall back to regular password
+                                    if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
+                                        connectionData.encodedSudoPassword?.let { sudoPassword ->
+                                            logger.info("Sending sudo password")
+                                            terminal.executeCommand("$sudoPassword\n")
+                                            sudoState = AuthState.COMPLETED
+                                        }
+                                    } else {
+                                        logger.info("No specific sudo password provided, using regular password")
+                                        connectionData.encodedPassword?.let { password ->
+                                            terminal.executeCommand("$password\n")
+                                            sudoState = AuthState.COMPLETED
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        
+                        // Sleep before next check to reduce CPU usage
+                        Thread.sleep(pollInterval)
+                    }
+                    
+                    // Log results of automation
+                    if (System.currentTimeMillis() - startTime >= maxWaitTime) {
+                        logger.info("Timeout reached during password automation for ${connectionData.alias}")
                     } else {
-                        // For password auth or key without passphrase, wait for the connection itself
-                        logger.info("Waiting for potential connection establishment for ${connectionData.alias}")
-                        Thread.sleep(2500) // Adjust timing if needed
+                        logger.info("Password automation completed successfully for ${connectionData.alias}")
                     }
-
-                    // If auto-sudo is enabled for Linux servers, run sudo command after connection
-                    if (connectionData.osType == OsType.LINUX && connectionData.useSudo) {
-                        logger.info("Attempting sudo elevation for ${connectionData.alias}")
-                        // Send the sudo command to elevate privileges
-                        terminal.executeCommand("sudo -s")
-
-                        // If a specific sudo password was provided, enter it after a short wait
-                        if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
-                            logger.info("Sudo password provided for ${connectionData.alias}. Waiting for prompt...")
-                            // Wait for sudo password prompt
-                            Thread.sleep(1000) // Adjust timing if needed
-
-                            connectionData.encodedSudoPassword?.let { sudoPassword ->
-                                logger.info("Sending sudo password for ${connectionData.alias}")
-                                // Use password already in connectionData - no need to re-decrypt
-                                terminal.executeCommand("$sudoPassword\n") // Append newline
-                                logger.debug("Sudo password sent for ${connectionData.alias}")
-                            }
-                        } else {
-                            println("no sudo password provided for ${connectionData.alias}")
-                            // Use user password if no sudo password was provided
-                            connectionData.encodedPassword?.let { keyPassword ->
-                                println("Sending key passphrase for ${connectionData.alias} ${keyPassword}")
-                                // Use password already in connectionData - no need to re-decrypt
-                                terminal.executeCommand("$keyPassword\n") // Append newline
-                            }
-                        }
-                    }
-                    logger.info("Background handling thread finished for ${connectionData.alias}")
+                    
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt() // Restore interrupt status
                     logger.warn("Background handling thread interrupted for ${connectionData.alias}", ie)
