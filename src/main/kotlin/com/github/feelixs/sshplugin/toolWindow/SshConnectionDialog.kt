@@ -179,7 +179,7 @@ class SshConnectionDialog(
         sudoPanel.add(useSudoCheckbox, BorderLayout.NORTH)
         
         val sudoPasswordPanel = JPanel(BorderLayout())
-        sudoPasswordPanel.add(JBLabel("Sudo Password (if different than user password):"), BorderLayout.WEST)
+        sudoPasswordPanel.add(JBLabel("Sudo Password (if user doesn't have sudo privileges):"), BorderLayout.WEST)
         sudoPasswordPanel.add(sudoPasswordField, BorderLayout.CENTER)
         sudoPasswordPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
         
