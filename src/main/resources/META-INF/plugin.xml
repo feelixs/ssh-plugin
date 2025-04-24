@@ -41,6 +41,11 @@
                     class="com.github.feelixs.sshplugin.actions.ConnectAction"
                     text="Connect"
                     description="Connect using the selected SSH configuration"/>
+            <separator/>
+            <action id="SSHPlugin.CopySudoPassword"
+                    class="com.github.feelixs.sshplugin.actions.CopySudoPasswordAction"
+                    text="Copy Sudo Password"
+                    description="Copy the sudo password of the selected connection to clipboard"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/> <!-- Example: Add group to Tools menu -->
         </group>
     </actions>
