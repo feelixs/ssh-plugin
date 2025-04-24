@@ -40,6 +40,10 @@
                     class="com.github.feelixs.sshplugin.actions.EditConnectionAction"
                     text="Edit Connection"
                     description="Edit the selected SSH connection configuration"/>
+            <action id="SSHPlugin.DuplicateConnection"
+                    class="com.github.feelixs.sshplugin.actions.DuplicateConnectionAction"
+                    text="Duplicate Connection"
+                    description="Create a copy of the selected SSH connection configuration"/>
             <action id="SSHPlugin.DeleteConnection"
                     class="com.github.feelixs.sshplugin.actions.DeleteConnectionAction"
                     text="Delete Connection"

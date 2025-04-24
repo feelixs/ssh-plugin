@@ -137,6 +137,40 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
             }
         }
     }
+    
+    /**
+     * Duplicates the currently selected connection with a "Copy of" prefix.
+     */
+    fun duplicateConnection() {
+        val selectedConnection = connectionList.selectedValue
+        if (selectedConnection != null) {
+            // Get a copy with decrypted passwords
+            val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
+            if (connectionWithPasswords != null) {
+                // Create a clone with a new ID and modified alias
+                val duplicatedConnection = connectionWithPasswords.copy(
+                    id = java.util.UUID.randomUUID().toString(),
+                    alias = "Copy of ${connectionWithPasswords.alias}"
+                )
+                
+                // Add the duplicated connection
+                connectionStorageService.addConnection(duplicatedConnection)
+                println("Duplicated connection: ${selectedConnection.alias} -> ${duplicatedConnection.alias}")
+                
+                // Reload the list to show the new connection
+                loadConnections()
+                
+                // Select the new connection in the list
+                for (i in 0 until listModel.size()) {
+                    val connection = listModel.getElementAt(i)
+                    if (connection.id == duplicatedConnection.id) {
+                        connectionList.selectedIndex = i
+                        break
+                    }
+                }
+            }
+        }
+    }
 
     // --- DataProvider Implementation ---
     override fun uiDataSnapshot(sink: DataSink) {
