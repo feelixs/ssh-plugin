@@ -2,8 +2,10 @@ package com.github.feelixs.sshplugin.services
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.ToolWindowManager
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
 
@@ -104,8 +106,17 @@ class SshConnectionExecutor(private val project: Project) {
                             }
                         }
                     }
-                    
                     println("Timed password automation completed for ${connectionData.alias}")
+                    
+                    // Focus terminal after automation completes using proper UI thread handling
+                    ApplicationManager.getApplication().invokeLater {
+                        val toolWindowManager = ToolWindowManager.getInstance(project)
+                        val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
+                        terminalToolWindow?.show {
+                            terminal.component.requestFocusInWindow()
+                            println("Terminal focus requested on UI thread")
+                        }
+                    }
                     
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt() // Restore interrupt status
