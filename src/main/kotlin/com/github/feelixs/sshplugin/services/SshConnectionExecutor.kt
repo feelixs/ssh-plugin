@@ -14,15 +14,48 @@ import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
+ * Maintains a mapping of connection IDs to their terminal instances.
  */
 @Service
 class SshConnectionExecutor(private val project: Project) {
 
-    private var activeTerminal: TerminalWidget? = null
+    // Map of connection IDs to their terminal widgets
+    private val terminalMap = mutableMapOf<String, TerminalWidget>()
     private val logger = thisLogger()
 
-    fun getTerminal(): TerminalWidget? {
-        return activeTerminal
+    /**
+     * Gets the terminal instance for a specific connection ID
+     * 
+     * @param connectionId The ID of the connection to get the terminal for.
+     *                     If null, returns the most recently used terminal.
+     * @return The terminal widget for the specified connection or null if not found
+     */
+    fun getTerminal(connectionId: String? = null): TerminalWidget? {
+        return if (connectionId != null) {
+            terminalMap[connectionId]
+        } else {
+            // If no specific ID is provided, return the most recently used terminal (if any)
+            terminalMap.values.lastOrNull()
+        }
+    }
+    
+    /**
+     * Gets all active terminal instances
+     * 
+     * @return Map of connection IDs to terminal widgets
+     */
+    fun getAllTerminals(): Map<String, TerminalWidget> {
+        return terminalMap.toMap()
+    }
+    
+    /**
+     * Removes a terminal from the map when it's closed or disconnected
+     * 
+     * @param connectionId The ID of the connection to remove
+     */
+    fun removeTerminal(connectionId: String) {
+        terminalMap.remove(connectionId)
+        println("Removed terminal for connection ID: $connectionId")
     }
 
 
@@ -59,7 +92,9 @@ class SshConnectionExecutor(private val project: Project) {
         val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
-        this.activeTerminal = terminal
+        
+        // Store terminal in the map with the connection ID
+        terminalMap[connectionId] = terminal
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
