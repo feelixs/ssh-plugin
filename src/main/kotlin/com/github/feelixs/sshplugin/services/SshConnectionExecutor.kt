@@ -67,16 +67,24 @@ class SshConnectionExecutor(private val project: Project) {
                 try {
                     // When using SSH key, we may need to handle the passphrase prompt
                     if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) {
-                        logger.info("SSH key requires passphrase for ${connectionData.alias}. Sending passphrase.")
+                        logger.info("SSH key requires passphrase for ${connectionData.alias}. Waiting for prompt...")
+                        Thread.sleep(3000)
+
                         // Send the passphrase to the terminal, followed by a newline
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             logger.info("Sending key passphrase for ${connectionData.alias}")
                             // Use password already in connectionData - no need to re-decrypt
                             terminal.executeCommand("$keyPassword\n") // Append newline
                         }
-                        // Passphrase sent, connection should proceed.
+
+                        // Wait for connection to establish after sending passphrase
+                        logger.info("Waiting for connection to establish after passphrase for ${connectionData.alias}")
+                        Thread.sleep(2000) // Adjust timing if needed
+                    } else {
+                        // For password auth or key without passphrase, wait for the connection itself
+                        logger.info("Waiting for potential connection establishment for ${connectionData.alias}")
+                        Thread.sleep(2500) // Adjust timing if needed
                     }
-                    // No explicit wait needed here anymore, proceed directly to sudo check if applicable.
 
                     // If auto-sudo is enabled for Linux servers, run sudo command after connection
                     if (connectionData.osType == OsType.LINUX && connectionData.useSudo) {
@@ -84,10 +92,12 @@ class SshConnectionExecutor(private val project: Project) {
                         // Send the sudo command to elevate privileges
                         terminal.executeCommand("sudo -s")
 
-                        // If a specific sudo password was provided, enter it
+                        // If a specific sudo password was provided, enter it after a short wait
                         if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
-                            logger.info("Sudo password provided for ${connectionData.alias}. Sending password.")
-                            // Send the sudo password immediately after the sudo command
+                            logger.info("Sudo password provided for ${connectionData.alias}. Waiting for prompt...")
+                            // Wait for sudo password prompt
+                            Thread.sleep(1000) // Adjust timing if needed
+
                             connectionData.encodedSudoPassword?.let { sudoPassword ->
                                 logger.info("Sending sudo password for ${connectionData.alias}")
                                 // Use password already in connectionData - no need to re-decrypt
