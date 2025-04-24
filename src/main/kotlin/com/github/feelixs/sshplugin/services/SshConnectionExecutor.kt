@@ -105,12 +105,12 @@ class SshConnectionExecutor(private val project: Project) {
                                 logger.debug("Sudo password sent for ${connectionData.alias}")
                             }
                         } else {
+                            println("no sudo password provided for ${connectionData.alias}")
                             // Use user password if no sudo password was provided
-                            connectionData.encodedPassword?.let { userPassword ->
-                                logger.info("Using regular user password for sudo on ${connectionData.alias}")
-                                Thread.sleep(1000) // Wait for sudo password prompt
-                                terminal.executeCommand("$userPassword\n") // Append newline
-                                logger.debug("User password sent for sudo on ${connectionData.alias}")
+                            connectionData.encodedPassword?.let { keyPassword ->
+                                println("Sending key passphrase for ${connectionData.alias} ${keyPassword}")
+                                // Use password already in connectionData - no need to re-decrypt
+                                terminal.executeCommand("$keyPassword\n") // Append newline
                             }
                         }
                     }

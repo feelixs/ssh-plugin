@@ -251,7 +251,7 @@ class SshConnectionDialog(
             host = hostField.text,
             port = portField.text.toInt(),
             username = usernameField.text,
-            encodedPassword = if (!useKey) passwordField.password.joinToString("") else null,
+            encodedPassword = passwordField.password.joinToString(""),
             osType = osType,
             useSudo = useSudo,
             // Only use separate sudo password if provided (otherwise system will use user password)
