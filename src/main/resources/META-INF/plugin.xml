@@ -12,6 +12,9 @@
     <extensions defaultExtensionNs="com.intellij">
         <!-- Register the application-level service for storing connections -->
         <applicationService serviceImplementation="com.github.feelixs.sshplugin.services.SshConnectionStorageService"/>
+        
+        <!-- Register project-level service for SSH connection execution -->
+        <projectService serviceImplementation="com.github.feelixs.sshplugin.services.SshConnectionExecutor"/>
 
         <!-- Define the tool window -->
         <toolWindow
@@ -46,6 +49,10 @@
                     class="com.github.feelixs.sshplugin.actions.ConnectAction"
                     text="Connect"
                     description="Connect using the selected SSH configuration"/>
+            <action id="SSHPlugin.Disconnect"
+                    class="com.github.feelixs.sshplugin.actions.DisconnectAction"
+                    text="End Session"
+                    description="Forcefully disconnect the session"/>
             <separator/>
             <action id="SSHPlugin.CopySudoPassword"
                     class="com.github.feelixs.sshplugin.actions.CopySudoPasswordAction"

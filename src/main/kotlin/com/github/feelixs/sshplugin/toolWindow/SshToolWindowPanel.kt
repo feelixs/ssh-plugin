@@ -3,6 +3,7 @@ package com.github.feelixs.sshplugin.toolWindow
 import com.github.feelixs.sshplugin.actions.PluginDataKeys
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
@@ -125,8 +126,8 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     fun connect() {
         val selectedConnection = connectionList.selectedValue
         if (selectedConnection != null) {
-            // Execute the SSH connection using our executor
-            val executor = com.github.feelixs.sshplugin.services.SshConnectionExecutor(project)
+            // Get the service instance of SshConnectionExecutor
+            val executor = project.getService(com.github.feelixs.sshplugin.services.SshConnectionExecutor::class.java)
             val success = executor.executeConnection(selectedConnection.id)
             
             if (success) {

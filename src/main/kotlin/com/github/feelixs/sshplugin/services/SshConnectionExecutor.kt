@@ -3,18 +3,28 @@ package com.github.feelixs.sshplugin.services
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.openapi.application.ApplicationManager
+import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.ToolWindowManager
-import org.jetbrains.plugins.terminal.TerminalToolWindowManager
+import com.intellij.terminal.ui.TerminalWidget
+import com.jediterm.terminal.Terminal
 import org.jetbrains.plugins.terminal.ShellTerminalWidget
+import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
  */
+@Service
 class SshConnectionExecutor(private val project: Project) {
 
+    private var activeTerminal: TerminalWidget? = null
     private val logger = thisLogger()
+
+    fun getTerminal(): TerminalWidget? {
+        return activeTerminal
+    }
+
 
     /**
      * Open a terminal tab and execute the SSH command for the given connection.
@@ -49,7 +59,7 @@ class SshConnectionExecutor(private val project: Project) {
         val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
-
+        this.activeTerminal = terminal
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
@@ -107,7 +117,7 @@ class SshConnectionExecutor(private val project: Project) {
                         }
                     }
                     println("Timed password automation completed for ${connectionData.alias}")
-                    
+
                     // Focus terminal after automation completes using proper UI thread handling
                     ApplicationManager.getApplication().invokeLater {
                         val toolWindowManager = ToolWindowManager.getInstance(project)
