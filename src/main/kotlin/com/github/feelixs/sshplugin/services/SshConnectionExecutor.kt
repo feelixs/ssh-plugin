@@ -105,7 +105,13 @@ class SshConnectionExecutor(private val project: Project) {
                                 logger.debug("Sudo password sent for ${connectionData.alias}")
                             }
                         } else {
-                            logger.info("No sudo password provided for ${connectionData.alias}. Manual entry might be required.")
+                            // Use user password if no sudo password was provided
+                            connectionData.encodedPassword?.let { userPassword ->
+                                logger.info("Using regular user password for sudo on ${connectionData.alias}")
+                                Thread.sleep(1000) // Wait for sudo password prompt
+                                terminal.executeCommand("$userPassword\n") // Append newline
+                                logger.debug("User password sent for sudo on ${connectionData.alias}")
+                            }
                         }
                     }
                     logger.info("Background handling thread finished for ${connectionData.alias}")
