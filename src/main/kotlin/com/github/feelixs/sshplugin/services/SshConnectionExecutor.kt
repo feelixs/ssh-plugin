@@ -53,16 +53,11 @@ class SshConnectionExecutor(private val project: Project) {
         // Create a terminal tab for the connection
         val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
-        val terminal = terminalManager.createLocalShellWidget(project.basePath ?: "", tabName) as? ShellTerminalWidget
-        
-        if (terminal == null) {
-            logger.error("Failed to create terminal widget for connection ${connectionData.alias}")
-            return false
-        }
+        val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
 
         // Execute the SSH command
         logger.info("Executing command in terminal for ${connectionData.alias}")
-        terminal.executeCommand(sshCommand)
+        terminal.sendCommandToExecute(sshCommand)
         
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
@@ -113,7 +108,7 @@ class SshConnectionExecutor(private val project: Project) {
                         // Handle key passphrase if needed
                         if (keyPassphraseState == AuthState.WAITING) {
                             // Get terminal title and visible lines to check for passphrase prompt
-                            val visibleTerminalText = (terminal.terminalTitle ?: "").lowercase()
+                            val visibleTerminalText = terminal.terminalTitle.toString().lowercase()
                             
                             // Check if any passphrase patterns match the terminal text
                             val passphrasePromptDetected = keyPassphrasePromptPatterns.any { 
@@ -124,7 +119,7 @@ class SshConnectionExecutor(private val project: Project) {
                                 logger.info("Detected key passphrase prompt for ${connectionData.alias}")
                                 connectionData.encodedKeyPassword?.let { keyPassword ->
                                     logger.info("Sending key passphrase")
-                                    terminal.executeCommand("$keyPassword\n")
+                                    terminal.sendCommandToExecute("$keyPassword\n")
                                     keyPassphraseState = AuthState.COMPLETED
                                 }
                             }
@@ -134,7 +129,7 @@ class SshConnectionExecutor(private val project: Project) {
                         if (keyPassphraseState == AuthState.COMPLETED && sudoState != AuthState.COMPLETED) {
                             // If sudo not started yet, wait for shell prompt then send sudo command
                             if (sudoState == AuthState.NOT_STARTED) {
-                                val terminalText = terminal.terminalTitle ?: ""
+                                val terminalText = terminal.terminalTitle
                                 
                                 // Check if shell prompt is detected (connection established)
                                 val shellPromptDetected = shellPromptPatterns.any { 
@@ -143,7 +138,7 @@ class SshConnectionExecutor(private val project: Project) {
                                 
                                 if (shellPromptDetected) {
                                     logger.info("Detected shell prompt, running sudo command for ${connectionData.alias}")
-                                    terminal.executeCommand("sudo -s\n")
+                                    terminal.sendCommandToExecute("sudo -s\n")
                                     sudoState = AuthState.WAITING
                                     // Reset timer to give enough time for sudo prompt
                                     Thread.sleep(500)
@@ -165,13 +160,13 @@ class SshConnectionExecutor(private val project: Project) {
                                     if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
                                         connectionData.encodedSudoPassword?.let { sudoPassword ->
                                             logger.info("Sending sudo password")
-                                            terminal.executeCommand("$sudoPassword\n")
+                                            terminal.sendCommandToExecute("$sudoPassword\n")
                                             sudoState = AuthState.COMPLETED
                                         }
                                     } else {
                                         logger.info("No specific sudo password provided, using regular password")
                                         connectionData.encodedPassword?.let { password ->
-                                            terminal.executeCommand("$password\n")
+                                            terminal.sendCommandToExecute("$password\n")
                                             sudoState = AuthState.COMPLETED
                                         }
                                     }
