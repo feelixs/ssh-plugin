@@ -6,12 +6,15 @@
 
 ## About
 
+<!-- Plugin description -->
 A comprehensive SSH password manager which securely initiates SSH connections to the IDE's terminal using your saved, encoded passwords. Features include:
 
 - Store all your SSH-key passwords in an easily accessible tool window.
 - Run the plugin's "SSH Connector" IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
+- Run the "Connect" button to initiate SSH to the selected connection.
 - You can enter server information into the corresponding SSH key's info section. What is the base-OS of your server (Windows/Linux)
 - For Linux machines, you can check off the "Automatically enter sudo mode" & provide a root password to enter escalated sudo mode by default after the SSH connection succeeds.
+<!-- Plugin description end -->
 
 ## Template ToDo list
 - [x] Create a new [IntelliJ Platform Plugin Template][template] project.
@@ -24,14 +27,6 @@ A comprehensive SSH password manager which securely initiates SSH connections to
 - [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
 - [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
 - [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
-
-<!-- Plugin description -->
-This Fancy IntelliJ Platform Plugin is going to be your implementation of the brilliant ideas that you have.
-
-This specific section is a source for the [plugin.xml](/src/main/resources/META-INF/plugin.xml) file which will be extracted by the [Gradle](/build.gradle.kts) during the build process.
-
-To keep everything working, do not remove `<!-- ... -->` sections. 
-<!-- Plugin description end -->
 
 ## Installation
 
