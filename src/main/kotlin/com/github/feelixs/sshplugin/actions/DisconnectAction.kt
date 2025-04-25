@@ -28,7 +28,8 @@ class DisconnectAction : AnAction(AllIcons.Actions.Suspend), DumbAware {
                 
                 // Send Ctrl+D (EOF) to each terminal
                 terminals.forEach { terminal ->
-                    terminal.sendCommandToExecute("\u0004")
+                    terminal.sendCommandToExecute("\u0004") // disconnect from ssh
+                    terminal.sendCommandToExecute("\u0004") // close terminal window
                 }
                 
                 // Remove all terminals from the map

@@ -2,15 +2,16 @@ package com.github.feelixs.sshplugin.services
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
-import com.intellij.openapi.application.ApplicationManager
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
-import java.awt.event.FocusEvent
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
@@ -67,7 +68,16 @@ class SshConnectionExecutor(private val project: Project) {
     fun getTerminalCount(connectionId: String): Int {
         return terminalMap[connectionId]?.size ?: 0
     }
-    
+
+    fun removeTerminal(connectionId: String): Boolean {
+        try {
+            terminalMap.remove(connectionId)
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
     /**
      * Removes all terminals for a connection from the map
      * 
@@ -81,6 +91,13 @@ class SshConnectionExecutor(private val project: Project) {
         return count
     }
 
+    private fun showNotification(project: com.intellij.openapi.project.Project?, message: String, type: NotificationType) {
+        val notificationGroup = NotificationGroupManager.getInstance()
+            .getNotificationGroup("SSH Plugin Notifications")
+
+        notificationGroup.createNotification(message, type)
+            .notify(project)
+    }
 
     /**
      * Open a terminal tab and execute the SSH command for the given connection.
@@ -116,24 +133,38 @@ class SshConnectionExecutor(private val project: Project) {
         val tabName = connectionData.alias
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
         
+        // Register a disposable listener to detect when the terminal is closed
+        Disposer.register(terminal, {
+            handleTerminalClosed(connectionId, terminal)
+        })
+        
         // Store terminal in the map with the connection ID
         terminalMap.getOrPut(connectionId) { mutableListOf() }.add(terminal)
+
+        val toolWindowManager = ToolWindowManager.getInstance(project)
+        val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
+        terminalToolWindow?.activate {
+            println("Terminal focus requested on UI thread : ${terminal.hasFocus()}")
+        }
+        // this will obscure the actual shh automation so that the user can't interfere accidentally
+        val temp = terminalManager.createShellWidget(project.basePath ?: "", "SSH", false, false)
+
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
-        
+        temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias}\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
             (connectionData.osType == OsType.LINUX && connectionData.useSudo)) {
             
             println("Starting background thread for timed password automation for ${connectionData.alias}")
-            
+
             // Create a separate thread for handling interactive prompts
             Thread {
                 try {
                     // Fixed timing delays for authentication steps
-                    val initialDelay = 2000L        // Wait for SSH to start and possibly show passphrase prompt
-                    val sshEstablishDelay = 3000L   // Wait for SSH connection to establish
+                    val initialDelay = 4000L        // Wait for SSH to start and possibly show passphrase prompt
+                    val sshEstablishDelay = 4000L   // Wait for SSH connection to establish
                     val sudoPromptDelay = 1500L     // Wait for sudo prompt to appear
                     
                     // Handle key passphrase if needed (enter after initial delay)
@@ -174,21 +205,16 @@ class SshConnectionExecutor(private val project: Project) {
                             }
                         }
                     }
+                    Thread.sleep(sudoPromptDelay)
                     println("Timed password automation completed for ${connectionData.alias}")
-
-                    // Focus terminal after automation completes using proper UI thread handling
-                    ApplicationManager.getApplication().invokeLater {
-                        val toolWindowManager = ToolWindowManager.getInstance(project)
-                        val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
+                    if (connectionData.maximizeTerminal) {
                         terminalToolWindow?.activate {
-                            IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
-                            println("Terminal focus requested on UI thread")
-                            if (connectionData.maximizeTerminal) {
-                                toolWindowManager.setMaximized(terminalToolWindow, true)
-                            }
+                            toolWindowManager.setMaximized(terminalToolWindow, true)
                         }
                     }
-                    
+                    IdeFocusManager.getInstance(project).requestFocus(temp.component, true)
+                    temp.sendCommandToExecute("\u0004")  //exit temp window
+
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt() // Restore interrupt status
                     logger.warn("Background handling thread interrupted for ${connectionData.alias}", ie)
@@ -202,6 +228,45 @@ class SshConnectionExecutor(private val project: Project) {
         }
 
         return true
+    }
+
+    /**
+     * Handles cleanup when a terminal is closed by the user
+     * 
+     * @param connectionId The ID of the connection associated with the terminal
+     * @param terminal The terminal widget that was closed
+     */
+    private fun handleTerminalClosed(connectionId: String, terminal: TerminalWidget) {
+        logger.info("Terminal closed for connection ID: $connectionId")
+        
+        // Remove this specific terminal from the map
+        val terminals = terminalMap[connectionId]
+        terminals?.remove(terminal)
+        
+        // Log the terminal count after removal
+        logger.info("Terminals remaining for connection $connectionId: ${terminals?.size ?: 0}")
+        
+        // If this was the last terminal for this connection, remove the connection entry
+        if (terminals?.isEmpty() == true) {
+            terminalMap.remove(connectionId)
+            logger.info("Removed last terminal for connection ID: $connectionId")
+            
+            // You can add additional cleanup logic here
+            // For example, notify other components that the connection is fully closed
+        }
+        
+        // Force refresh of any components that might be using terminal count
+        notifyTerminalCountChanged(connectionId)
+    }
+    
+    /**
+     * Notifies other components that terminal count has changed
+     * Override this or implement event system if needed
+     */
+    private fun notifyTerminalCountChanged(connectionId: String) {
+        // This is a placeholder for an event system
+        // You might want to implement a proper event publishing mechanism
+        println("Terminal count changed for connection ID: $connectionId, count: ${getTerminalCount(connectionId)}")
     }
 
     private fun logConnectionDetails(connection: SshConnectionData) {

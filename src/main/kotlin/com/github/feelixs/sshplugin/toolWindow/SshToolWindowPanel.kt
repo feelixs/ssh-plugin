@@ -1,7 +1,6 @@
 package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.actions.PluginDataKeys
-import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
@@ -26,7 +25,8 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     private val connectionStorageService = SshConnectionStorageService.instance
     private val listModel = DefaultListModel<SshConnectionData>()
     private val connectionList = JBList(listModel)
-    
+    val executor = project.getService(SshConnectionExecutor::class.java)
+
     // Timer to refresh connection list status
     private val refreshTimer = Timer("SSH-Connection-Status-Timer", true)
     
@@ -208,6 +208,12 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
                         if (connectionList.isShowing && connectionList.isValid) {
                             connectionList.repaint()
                         }
+                        /*for (connection in connectionStorageService.getConnections()) {
+                            val thiscon = executor.getTerminal(connection.id)
+                            println(thiscon.toString())
+                            println(thiscon?.hasFocus())
+                            println(executor.getTerminalCount(connection.id).toString())
+                        }*/
                     } catch (e: Exception) {
                         // Ignore exceptions that might occur during shutdown
                         refreshTimer.cancel()
