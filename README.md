@@ -12,8 +12,6 @@ A comprehensive SSH password manager which securely initiates SSH connections to
 - Store all your SSH-key passwords in an easily accessible tool window.
 - Run the plugin's "SSH Connector" IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
 - Run the "Connect" button to initiate SSH to the selected connection.
-- You can enter server information into the corresponding SSH key's info section. What is the base-OS of your server (Windows/Linux)
-- For Linux machines, you can check off the "Automatically enter sudo mode" & provide a root password to enter escalated sudo mode by default after the SSH connection succeeds.
 <!-- Plugin description end -->
 
 ## Template ToDo list
