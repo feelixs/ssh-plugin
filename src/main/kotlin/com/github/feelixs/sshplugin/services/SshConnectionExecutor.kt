@@ -7,6 +7,7 @@ import com.intellij.notification.NotificationType
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.util.Disposer
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
@@ -131,6 +132,12 @@ class SshConnectionExecutor(private val project: Project) {
         val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
+        
+        // Register a disposable listener to detect when the terminal is closed
+        Disposer.register(terminal, {
+            handleTerminalClosed(connectionId, terminal)
+        })
+        
         // Store terminal in the map with the connection ID
         terminalMap.getOrPut(connectionId) { mutableListOf() }.add(terminal)
 
@@ -221,6 +228,45 @@ class SshConnectionExecutor(private val project: Project) {
         }
 
         return true
+    }
+
+    /**
+     * Handles cleanup when a terminal is closed by the user
+     * 
+     * @param connectionId The ID of the connection associated with the terminal
+     * @param terminal The terminal widget that was closed
+     */
+    private fun handleTerminalClosed(connectionId: String, terminal: TerminalWidget) {
+        logger.info("Terminal closed for connection ID: $connectionId")
+        
+        // Remove this specific terminal from the map
+        val terminals = terminalMap[connectionId]
+        terminals?.remove(terminal)
+        
+        // Log the terminal count after removal
+        logger.info("Terminals remaining for connection $connectionId: ${terminals?.size ?: 0}")
+        
+        // If this was the last terminal for this connection, remove the connection entry
+        if (terminals?.isEmpty() == true) {
+            terminalMap.remove(connectionId)
+            logger.info("Removed last terminal for connection ID: $connectionId")
+            
+            // You can add additional cleanup logic here
+            // For example, notify other components that the connection is fully closed
+        }
+        
+        // Force refresh of any components that might be using terminal count
+        notifyTerminalCountChanged(connectionId)
+    }
+    
+    /**
+     * Notifies other components that terminal count has changed
+     * Override this or implement event system if needed
+     */
+    private fun notifyTerminalCountChanged(connectionId: String) {
+        // This is a placeholder for an event system
+        // You might want to implement a proper event publishing mechanism
+        println("Terminal count changed for connection ID: $connectionId, count: ${getTerminalCount(connectionId)}")
     }
 
     private fun logConnectionDetails(connection: SshConnectionData) {
