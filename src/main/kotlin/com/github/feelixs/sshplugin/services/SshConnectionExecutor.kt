@@ -9,6 +9,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
+import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 /**
@@ -114,7 +115,6 @@ class SshConnectionExecutor(private val project: Project) {
         val terminalManager = TerminalToolWindowManager.getInstance(project)
         val tabName = connectionData.alias
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
-        
         // Store terminal in the map with the connection ID
         terminalMap.getOrPut(connectionId) { mutableListOf() }.add(terminal)
         // Execute the SSH command

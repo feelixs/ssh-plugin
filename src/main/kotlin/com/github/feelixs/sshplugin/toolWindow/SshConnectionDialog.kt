@@ -42,7 +42,17 @@ class SshConnectionDialog(
             "Select SSH Key",
             "Choose the SSH key file to use for authentication",
             project,
-            FileChooserDescriptorFactory.createSingleFileDescriptor()
+            FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
+                // Try to start in user's .ssh directory if it exists
+                val sshDir = System.getProperty("user.home") + "/.ssh"
+                if (java.io.File(sshDir).exists()) {
+                    val localFileSystem = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
+                    val virtualFile = localFileSystem.findFileByPath(sshDir)
+                    if (virtualFile != null) {
+                        setRoots(virtualFile)
+                    }
+                }
+            }
         )
     }
     private val keyPasswordField = JBPasswordField()
