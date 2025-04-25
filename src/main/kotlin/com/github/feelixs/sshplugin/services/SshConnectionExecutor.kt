@@ -181,9 +181,7 @@ class SshConnectionExecutor(private val project: Project) {
                         val toolWindowManager = ToolWindowManager.getInstance(project)
                         val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
                         terminalToolWindow?.activate {
-                            // In new UI, getComponent() returns the terminal panel; in old UI, getTerminalPanel() does
-                            val focusTarget = terminal.component
-                            IdeFocusManager.getInstance(project).requestFocus(focusTarget, true)
+                            IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
                             println("Terminal focus requested on UI thread")
                             if (connectionData.maximizeTerminal) {
                                 toolWindowManager.setMaximized(terminalToolWindow, true)
