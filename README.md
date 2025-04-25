@@ -12,7 +12,6 @@ A comprehensive SSH password manager which securely initiates SSH connections to
 - Run the plugin's "SSH Connector" IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
 - You can enter server information into the corresponding SSH key's info section. What is the base-OS of your server (Windows/Linux)
 - For Linux machines, you can check off the "Automatically enter sudo mode" & provide a root password to enter escalated sudo mode by default after the SSH connection succeeds.
-- Passwords are securely saved locally via <insert encryption/etc method here>. Passwords are stored in a way which doesn't matter the OS you're using for this plugin.
 
 ## Template ToDo list
 - [x] Create a new [IntelliJ Platform Plugin Template][template] project.
