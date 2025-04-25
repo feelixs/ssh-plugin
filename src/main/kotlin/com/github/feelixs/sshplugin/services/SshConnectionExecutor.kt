@@ -2,6 +2,8 @@ package com.github.feelixs.sshplugin.services
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.intellij.notification.NotificationGroupManager
+import com.intellij.notification.NotificationType
 import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
@@ -81,6 +83,13 @@ class SshConnectionExecutor(private val project: Project) {
         return count
     }
 
+    private fun showNotification(project: com.intellij.openapi.project.Project?, message: String, type: NotificationType) {
+        val notificationGroup = NotificationGroupManager.getInstance()
+            .getNotificationGroup("SSH Plugin Notifications")
+
+        notificationGroup.createNotification(message, type)
+            .notify(project)
+    }
 
     /**
      * Open a terminal tab and execute the SSH command for the given connection.
@@ -117,22 +126,31 @@ class SshConnectionExecutor(private val project: Project) {
         val terminal = terminalManager.createShellWidget(project.basePath ?: "", tabName, false, false)
         // Store terminal in the map with the connection ID
         terminalMap.getOrPut(connectionId) { mutableListOf() }.add(terminal)
+
+        val toolWindowManager = ToolWindowManager.getInstance(project)
+        val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
+        terminalToolWindow?.activate {
+            println("Terminal focus requested on UI thread : ${terminal.hasFocus()}")
+        }
+        // this will obscure the actual shh automation so that the user can't interfere accidentally
+        val temp = terminalManager.createShellWidget(project.basePath ?: "", "SSH", false, false)
+
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
-        
+        temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias}\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
             (connectionData.osType == OsType.LINUX && connectionData.useSudo)) {
             
             println("Starting background thread for timed password automation for ${connectionData.alias}")
-            
+
             // Create a separate thread for handling interactive prompts
             Thread {
                 try {
                     // Fixed timing delays for authentication steps
-                    val initialDelay = 2000L        // Wait for SSH to start and possibly show passphrase prompt
-                    val sshEstablishDelay = 3000L   // Wait for SSH connection to establish
+                    val initialDelay = 4000L        // Wait for SSH to start and possibly show passphrase prompt
+                    val sshEstablishDelay = 4000L   // Wait for SSH connection to establish
                     val sudoPromptDelay = 1500L     // Wait for sudo prompt to appear
                     
                     // Handle key passphrase if needed (enter after initial delay)
@@ -173,21 +191,16 @@ class SshConnectionExecutor(private val project: Project) {
                             }
                         }
                     }
+                    Thread.sleep(sudoPromptDelay)
                     println("Timed password automation completed for ${connectionData.alias}")
-
-                    // Focus terminal after automation completes using proper UI thread handling
-                    ApplicationManager.getApplication().invokeLater {
-                        val toolWindowManager = ToolWindowManager.getInstance(project)
-                        val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
+                    if (connectionData.maximizeTerminal) {
                         terminalToolWindow?.activate {
-                            IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
-                            println("Terminal focus requested on UI thread")
-                            if (connectionData.maximizeTerminal) {
-                                toolWindowManager.setMaximized(terminalToolWindow, true)
-                            }
+                            toolWindowManager.setMaximized(terminalToolWindow, true)
                         }
                     }
-                    
+                    IdeFocusManager.getInstance(project).requestFocus(temp.component, true)
+                    temp.sendCommandToExecute("\u0004")  //exit temp window
+
                 } catch (ie: InterruptedException) {
                     Thread.currentThread().interrupt() // Restore interrupt status
                     logger.warn("Background handling thread interrupted for ${connectionData.alias}", ie)
