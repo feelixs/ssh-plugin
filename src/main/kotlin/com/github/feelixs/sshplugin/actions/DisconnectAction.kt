@@ -26,9 +26,9 @@ class DisconnectAction : AnAction(AllIcons.Actions.Suspend), DumbAware {
             if (terminalCount > 0) {
                 println("Disconnecting ${terminalCount} session(s) for ${selectedConnection.alias}")
                 
-                // Send exit command to each terminal
+                // Send Ctrl+D (EOF) to each terminal
                 terminals.forEach { terminal ->
-                    terminal.sendCommandToExecute("exit\n")
+                    terminal.sendCommandToExecute("\u0004")
                 }
                 
                 // Remove all terminals from the map

@@ -60,6 +60,10 @@ class SshConnectionDialog(
     // Auto sudo option
     private val useSudoCheckbox = JBCheckBox("Auto sudo (automatically escalate the session to sudo mode after logging in)", 
         existingConnection?.useSudo ?: false)
+    
+    // Terminal options
+    private val maximizeTerminalCheckbox = JBCheckBox("Maximize terminal window on connect", 
+        existingConnection?.maximizeTerminal ?: false)
     private val sudoPasswordField = JBPasswordField()
     
     init {
@@ -185,6 +189,11 @@ class SshConnectionDialog(
         
         sudoPanel.add(sudoPasswordPanel, BorderLayout.CENTER)
         
+        // Terminal options panel
+        val terminalOptionsPanel = JPanel(BorderLayout())
+        terminalOptionsPanel.add(maximizeTerminalCheckbox, BorderLayout.NORTH)
+        terminalOptionsPanel.border = JBUI.Borders.empty(10, 0, 0, 0)
+        
         // Main form
         val mainPanel = FormBuilder.createFormBuilder()
             .addLabeledComponent("Alias:", aliasField)
@@ -196,6 +205,7 @@ class SshConnectionDialog(
             .addComponent(keyPanel)
             .addComponent(osTypePanel)
             .addComponent(sudoPanel)
+            .addComponent(terminalOptionsPanel)
             .addComponentFillVertically(JPanel(), 0)
             .panel
         
@@ -260,7 +270,8 @@ class SshConnectionDialog(
                                   else null,
             useKey = useKey,
             keyPath = if (useKey) keyPathField.text else "",
-            encodedKeyPassword = if (useKey) keyPasswordField.password.joinToString("") else null
+            encodedKeyPassword = if (useKey) keyPasswordField.password.joinToString("") else null,
+            maximizeTerminal = maximizeTerminalCheckbox.isSelected
         )
     }
 }

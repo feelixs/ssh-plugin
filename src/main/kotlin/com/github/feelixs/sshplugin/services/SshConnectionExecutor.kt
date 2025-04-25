@@ -6,11 +6,11 @@ import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
+import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
-import com.jediterm.terminal.Terminal
-import org.jetbrains.plugins.terminal.ShellTerminalWidget
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
+import java.awt.event.FocusEvent
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
@@ -180,9 +180,14 @@ class SshConnectionExecutor(private val project: Project) {
                     ApplicationManager.getApplication().invokeLater {
                         val toolWindowManager = ToolWindowManager.getInstance(project)
                         val terminalToolWindow = toolWindowManager.getToolWindow("Terminal")
-                        terminalToolWindow?.show {
-                            terminal.component.requestFocusInWindow()
+                        terminalToolWindow?.activate {
+                            // In new UI, getComponent() returns the terminal panel; in old UI, getTerminalPanel() does
+                            val focusTarget = terminal.component
+                            IdeFocusManager.getInstance(project).requestFocus(focusTarget, true)
                             println("Terminal focus requested on UI thread")
+                            if (connectionData.maximizeTerminal) {
+                                toolWindowManager.setMaximized(terminalToolWindow, true)
+                            }
                         }
                     }
                     
