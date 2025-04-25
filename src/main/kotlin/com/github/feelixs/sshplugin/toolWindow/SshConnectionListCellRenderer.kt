@@ -35,10 +35,10 @@ class SshConnectionListCellRenderer : ColoredListCellRenderer<SshConnectionData>
             com.github.feelixs.sshplugin.model.OsType.WINDOWS -> AllIcons.FileTypes.Any_type
         }
         setIcon(icon)
-        
-        // Check if this connection has active sessions
-        val activeSessionCount = getActiveSessionCount(value.id)
-        
+
+        // Check if this connection has active sessions by looking for terminal tabs with the expected title
+        val activeSessionCount = getActiveSessionCount(value)
+
         // Add asterisk indicator for active connections
         if (activeSessionCount > 0) {
             // Show asterisk and session count for active connections
