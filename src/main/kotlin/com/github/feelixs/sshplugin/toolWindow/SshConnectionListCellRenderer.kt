@@ -1,10 +1,8 @@
 package com.github.feelixs.sshplugin.toolWindow
 
-import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.intellij.icons.AllIcons
-import com.intellij.openapi.project.Project
 import com.intellij.openapi.project.ProjectManager
 import com.intellij.ui.ColoredListCellRenderer
 import com.intellij.ui.JBColor
@@ -71,41 +69,17 @@ class SshConnectionListCellRenderer : ColoredListCellRenderer<SshConnectionData>
     }
     
     /**
-     * Gets the count of active terminal sessions associated with the given connection data.
-     * It checks for terminal tabs whose titles start with "SSH: [connection_alias]".
-     *
-     * @param connectionData The connection data to check.
-     * @return The number of active terminal sessions found, or 0.
+     * Gets the count of active sessions for a connection ID
+     * 
+     * @param connectionId The ID of the connection to check
+     * @return The number of active sessions, or 0 if none
      */
-    private fun getActiveSessionCount(connectionData: SshConnectionData): Int {
-        // Find the project associated with the list component, if possible.
-        // Fallback to iterating open projects, but this is less reliable if multiple projects are open.
-        val project = findProjectForList(list) ?: ProjectManager.getInstance().openProjects.firstOrNull() ?: return 0
-        
+    private fun getActiveSessionCount(connectionId: String): Int {
+        // Try to get the executor service from the first open project
+        // This is a limitation, but should work in most cases
+        val project = ProjectManager.getInstance().openProjects.firstOrNull() ?: return 0
         val executor = project.getService(SshConnectionExecutor::class.java) ?: return 0
         
-        // Construct the expected title prefix
-        val titlePrefix = SshConnectionExecutor.TERMINAL_TITLE_PREFIX + connectionData.alias
-        
-        // Find terminals matching the title prefix
-        return executor.findTerminalWidgetsByTitlePrefix(titlePrefix).size
-    }
-
-    /**
-     * Helper function to find the Project associated with the JList component.
-     * This is a bit of a workaround, as renderers don't have direct project context.
-     */
-    private fun findProjectForList(list: JList<*>): Project? {
-        // Try to find the project from the component hierarchy
-        var parent = list.parent
-        while (parent != null) {
-            if (parent is com.intellij.openapi.ui.ComponentWithBrowseButton<*>) {
-                 // Could potentially get project context here if the component provides it
-            }
-            // Add more checks if needed based on where the list is embedded
-            parent = parent.parent
-        }
-        // Fallback if project cannot be determined from component hierarchy
-        return ProjectManager.getInstance().openProjects.firstOrNull()
+        return executor.getTerminalCount(connectionId)
     }
 }

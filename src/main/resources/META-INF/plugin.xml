@@ -4,14 +4,8 @@
     <name>SSH Password Manager</name>
     <vendor>feelixs</vendor>
 
-    <!-- Base Platform -->
     <depends>com.intellij.modules.platform</depends>
-    <!-- Terminal plugin for TerminalView API -->
-    <depends>com.intellij.modules.terminal</depends>
-    <!-- We already depend on the terminal plugin implementation via build.gradle.kts, 
-         but explicitly depending on the module here is good practice. -->
-    <depends optional="true" config-file="ssh-plugin-ultimate.xml">com.intellij.modules.ssh</depends> <!-- Optional dependency for potential future SSH API use -->
-
+    <depends>org.jetbrains.plugins.terminal</depends>
 
     <resource-bundle>messages.MyBundle</resource-bundle>
 
@@ -68,7 +62,7 @@
                     class="com.github.feelixs.sshplugin.actions.CopySudoPasswordAction"
                     text="Copy Sudo Password"
                     description="Copy the sudo password of the selected connection to clipboard"/>
-            <!-- Removed add-to-group for ToolsMenu as it's primarily a tool window -->
+            <add-to-group group-id="ToolsMenu" anchor="last"/> <!-- Example: Add group to Tools menu -->
         </group>
     </actions>
 
