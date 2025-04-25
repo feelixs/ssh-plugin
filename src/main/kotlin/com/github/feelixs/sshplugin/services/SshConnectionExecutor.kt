@@ -4,14 +4,12 @@ import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
 import com.intellij.notification.NotificationGroupManager
 import com.intellij.notification.NotificationType
-import com.intellij.openapi.application.ApplicationManager
 import com.intellij.openapi.components.Service
 import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
-import org.jetbrains.plugins.terminal.TerminalOptionsProvider
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
 
 /**
@@ -69,7 +67,16 @@ class SshConnectionExecutor(private val project: Project) {
     fun getTerminalCount(connectionId: String): Int {
         return terminalMap[connectionId]?.size ?: 0
     }
-    
+
+    fun removeTerminal(connectionId: String): Boolean {
+        try {
+            terminalMap.remove(connectionId)
+            return true
+        } catch (e: Exception) {
+            return false
+        }
+    }
+
     /**
      * Removes all terminals for a connection from the map
      * 
