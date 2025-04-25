@@ -10,7 +10,6 @@ import com.intellij.openapi.wm.IdeFocusManager
 import com.intellij.openapi.wm.ToolWindowManager
 import com.intellij.terminal.ui.TerminalWidget
 import org.jetbrains.plugins.terminal.TerminalToolWindowManager
-import java.awt.event.FocusEvent
 
 /**
  * Executes SSH connections in the IntelliJ terminal.
