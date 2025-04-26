@@ -339,6 +339,7 @@ class SshConnectionDialog(
             useKey = useKey,
             keyPath = if (useKey) keyPathField.text else "",
             encodedKeyPassword = if (useKey) keyPasswordField.password.joinToString("") else null,
+            useUserPasswordForSudo = useUserPasswordForSudoCheckbox.isSelected,
             maximizeTerminal = maximizeTerminalCheckbox.isSelected
         )
     }
