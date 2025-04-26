@@ -200,30 +200,24 @@ class SshConnectionExecutor(private val project: Project) {
                         )
                     }
                     if (!shouldbreak) {
-                        // Handle commands to run after successful connection
-                        if (connectionData.runCommands && connectionData.commands.isNotBlank()) {
-                            // Wait for SSH connection to fully establish before running commands
-                            println("Waiting ${sshEstablishDelay}ms for SSH connection to establish")
-                            Thread.sleep(sshEstablishDelay)
-                        }
-                        Thread.sleep(sudoPromptDelay)
-                        println("Timed password automation completed for ${connectionData.alias}")
                         if (connectionData.maximizeTerminal) {
                             terminalToolWindow?.activate {
                                 toolWindowManager.setMaximized(terminalToolWindow, true)
                             }
                         }
                         IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
-                        //temp.sendCommandToExecute("\u0004")  //exit temp window
-                        Thread.sleep(sudoPromptDelay)
 
-                        // Execute each command line by line
-                        if (connectionData.commands.isNotBlank()) {
+                        // Handle commands to run after successful connection
+                        if (connectionData.runCommands && connectionData.commands.isNotBlank()) {
                             showNotification(
                                 project,
-                                "Sending user-defined startup commands...",
-                                NotificationType.INFORMATION
+                                "You have configured some user-defined commands. Please don't enter anything into the terminal until they have been executed...",
+                                NotificationType.WARNING
                             )
+                            // Wait for SSH connection to fully establish before running commands
+                            println("Waiting ${sshEstablishDelay}ms for SSH connection to establish")
+                            Thread.sleep(sshEstablishDelay)
+
                             val commands = connectionData.commands.split("\n")
                             commands.forEach { command ->
                                 if (command.isNotBlank()) {
