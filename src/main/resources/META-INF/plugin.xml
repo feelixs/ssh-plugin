@@ -2,7 +2,7 @@
 <idea-plugin>
     <id>com.github.feelixs.sshplugin</id>
     <name>SSH Password Manager</name>
-    <vendor>feelixs</vendor>
+    <vendor email="michael@felixcreations.com" url="https://www.github.com/feelixs.">feelixs</vendor>
 
     <depends>com.intellij.modules.platform</depends>
     <depends>org.jetbrains.plugins.terminal</depends>
