@@ -147,12 +147,12 @@ class SshConnectionExecutor(private val project: Project) {
             println("Terminal focus requested on UI thread : ${terminal.hasFocus()}")
         }
         // this will obscure the actual shh automation so that the user can't interfere accidentally
-        val temp = terminalManager.createShellWidget(project.basePath ?: "", "SSH", false, false)
+        //val temp = terminalManager.createShellWidget(project.basePath ?: "", "SSH", false, false)
 
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
-        temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
+        //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and custom commands in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
             (connectionData.runCommands && connectionData.commands.isNotBlank())) {
@@ -191,8 +191,8 @@ class SshConnectionExecutor(private val project: Project) {
                             toolWindowManager.setMaximized(terminalToolWindow, true)
                         }
                     }
-                    IdeFocusManager.getInstance(project).requestFocus(temp.component, true)
-                    temp.sendCommandToExecute("\u0004")  //exit temp window
+                    IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
+                    //temp.sendCommandToExecute("\u0004")  //exit temp window
                     Thread.sleep(sudoPromptDelay)
 
                     // Execute each command line by line
