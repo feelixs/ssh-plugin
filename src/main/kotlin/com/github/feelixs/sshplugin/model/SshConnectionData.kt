@@ -14,8 +14,10 @@ data class SshConnectionData(
     // Password will be handled securely, not stored directly as plain text attribute
     var encodedPassword: String? = null, // Placeholder for securely stored password
     @Attribute("osType") var osType: OsType = OsType.LINUX,
-    @Attribute("useSudo") var useSudo: Boolean = false,
-    var encodedSudoPassword: String? = null, // Placeholder for securely stored sudo password
+    @Attribute("runCommands") var runCommands: Boolean = false, // Whether to run commands after connection
+    @Attribute("commands") var commands: String = "", // Commands to run after successful connection
+    var encodedSudoPassword: String? = null, // Placeholder for securely stored sudo password (kept for backwards compatibility)
+    @Attribute("useUserPasswordForSudo") var useUserPasswordForSudo: Boolean = false, // Whether to use the user password for sudo commands
     @Attribute("useKey") var useKey: Boolean = false, // Whether to use SSH key authentication
     @Attribute("keyPath") var keyPath: String = "", // Path to the SSH key file
     var encodedKeyPassword: String? = null, // Placeholder for securely stored key password
@@ -23,6 +25,24 @@ data class SshConnectionData(
 ) {
     // Default constructor for XML serialization
     constructor() : this(id = java.util.UUID.randomUUID().toString())
+    
+    // For backward compatibility
+    @Deprecated("Use runCommands and commands instead")
+    var useSudo: Boolean
+        get() = runCommands && commands.contains("sudo -s")
+        set(value) {
+            if (value) {
+                runCommands = true
+                if (!commands.contains("sudo -s")) {
+                    commands = if (commands.isBlank()) "sudo -s" else "sudo -s\n$commands"
+                }
+            } else {
+                commands = commands.replace("sudo -s\n", "").replace("sudo -s", "")
+                if (commands.isBlank()) {
+                    runCommands = false
+                }
+            }
+        }
 }
 
 enum class OsType {
