@@ -2,7 +2,7 @@ package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
@@ -13,10 +13,7 @@ import com.intellij.ui.components.JBPasswordField
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
-import com.intellij.util.ui.UIUtil
 import java.awt.BorderLayout
-import java.awt.CardLayout
-import java.awt.Component
 import java.awt.GridLayout
 import javax.swing.*
 
@@ -38,23 +35,29 @@ class SshConnectionDialog(
     private val useKeyCheckbox = JBCheckBox("Use SSH key authentication", existingConnection?.useKey ?: false)
     private val keyPathField = TextFieldWithBrowseButton().apply {
         text = existingConnection?.keyPath ?: ""
-        addBrowseFolderListener(
-            "Select SSH Key",
-            "Choose the SSH key file to use for authentication",
-            project,
-            FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
-                // Try to start in user's .ssh directory if it exists
-                val sshDir = System.getProperty("user.home") + "/.ssh"
-                if (java.io.File(sshDir).exists()) {
-                    val localFileSystem = com.intellij.openapi.vfs.LocalFileSystem.getInstance()
-                    val virtualFile = localFileSystem.findFileByPath(sshDir)
-                    if (virtualFile != null) {
-                        setRoots(virtualFile)
-                    }
-                }
+
+        val sshDir = System.getProperty("user.home") + "/.ssh"
+        val initialDir = java.io.File(sshDir).takeIf { it.exists() }?.let {
+            com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(it.path)
+        }
+
+        val descriptor = FileChooserDescriptor(true, false, false, false, false, false).apply {
+            title = "Select SSH Key"
+            description = "Choose the SSH key file to use for authentication"
+            if (initialDir != null) {
+                setRoots(initialDir)
             }
-        )
+        }
+
+        addActionListener {
+            val file = com.intellij.openapi.fileChooser.FileChooser.chooseFile(descriptor, project, initialDir)
+            if (file != null) {
+                text = file.path
+            }
+        }
     }
+
+
     private val keyPasswordField = JBPasswordField()
     
     // SSH key panel with path and passphrase fields
