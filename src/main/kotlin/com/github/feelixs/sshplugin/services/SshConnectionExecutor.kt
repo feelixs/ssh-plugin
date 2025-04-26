@@ -152,6 +152,11 @@ class SshConnectionExecutor(private val project: Project) {
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
+        showNotification(
+            project,
+            "Initializing SSH for ${connectionData.alias}, please wait...",
+            NotificationType.INFORMATION
+        )
         //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and custom commands in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
