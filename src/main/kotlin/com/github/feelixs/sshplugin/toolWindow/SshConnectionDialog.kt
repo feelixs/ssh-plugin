@@ -2,7 +2,7 @@ package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
-import com.intellij.openapi.fileChooser.FileChooserDescriptorFactory
+import com.intellij.openapi.fileChooser.FileChooserDescriptor
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
@@ -41,7 +41,7 @@ class SshConnectionDialog(
             com.intellij.openapi.vfs.LocalFileSystem.getInstance().findFileByPath(it.path)
         }
 
-        val descriptor = FileChooserDescriptorFactory.createSingleFileDescriptor().apply {
+        val descriptor = FileChooserDescriptor(true, false, false, false, false, false).apply {
             title = "Select SSH Key"
             description = "Choose the SSH key file to use for authentication"
             if (initialDir != null) {
@@ -56,6 +56,7 @@ class SshConnectionDialog(
             }
         }
     }
+
 
     private val keyPasswordField = JBPasswordField()
     
