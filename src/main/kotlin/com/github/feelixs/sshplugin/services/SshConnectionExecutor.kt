@@ -152,7 +152,7 @@ class SshConnectionExecutor(private val project: Project) {
         // Execute the SSH command
         println("Executing command in terminal for ${connectionData.alias}")
         terminal.sendCommandToExecute(sshCommand)
-        temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias}\n\n\n\\033[0m\\n\"")
+        //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias}\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and auto-sudo in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
             (connectionData.osType == OsType.LINUX && connectionData.useSudo)) {
