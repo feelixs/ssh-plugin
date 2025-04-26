@@ -210,6 +210,9 @@ class SshConnectionExecutor(private val project: Project) {
                                     // If this is a sudo command, it may need password
                                     if (command.trim().startsWith("sudo") && connectionData.osType == OsType.LINUX) {
                                         // Send appropriate sudo password if we have one
+                                        println(!connectionData.encodedSudoPassword.isNullOrEmpty())
+                                        println(connectionData.useUserPasswordForSudo)
+                                        println(!connectionData.encodedPassword.isNullOrEmpty())
                                         if (!connectionData.encodedSudoPassword.isNullOrEmpty() || (connectionData.useUserPasswordForSudo && !connectionData.encodedPassword.isNullOrEmpty())) {
                                             println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
                                             Thread.sleep(sudoPromptDelay)
