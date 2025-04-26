@@ -10,10 +10,13 @@ import com.intellij.openapi.ui.ValidationInfo
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
+import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.components.JBTextArea
 import com.intellij.ui.components.JBTextField
 import com.intellij.util.ui.FormBuilder
 import com.intellij.util.ui.JBUI
 import java.awt.BorderLayout
+import java.awt.Dimension
 import java.awt.GridLayout
 import javax.swing.*
 
@@ -70,14 +73,22 @@ class SshConnectionDialog(
     private val linuxRadioButton = JRadioButton("Linux")
     private val windowsRadioButton = JRadioButton("Windows")
     
-    // Auto sudo option
-    private val useSudoCheckbox = JBCheckBox("Auto sudo (automatically escalate the session to sudo mode after logging in)", 
-        existingConnection?.useSudo ?: false)
+    // Run commands option
+    private val runCommandsCheckbox = JBCheckBox("Run commands after successful connection", 
+        existingConnection?.runCommands ?: false)
+    private val commandsTextArea = JBTextArea(5, 40).apply {
+        text = existingConnection?.commands ?: ""
+        lineWrap = true
+        wrapStyleWord = true
+    }
+    private val commandsScrollPane = JBScrollPane(commandsTextArea)
+    
+    // Sudo password (kept for backward compatibility)
+    private val sudoPasswordField = JBPasswordField()
     
     // Terminal options
     private val maximizeTerminalCheckbox = JBCheckBox("Maximize terminal window on connect", 
         existingConnection?.maximizeTerminal ?: false)
-    private val sudoPasswordField = JBPasswordField()
     
     init {
         title = if (existingConnection == null) "Add SSH Connection" else "Edit SSH Connection"
@@ -110,8 +121,8 @@ class SshConnectionDialog(
             linuxRadioButton.isSelected = true
         }
         
-        // Make sure sudo options are properly enabled/disabled based on initial OS selection
-        updateSudoEnabled()
+        // Make sure command options are properly enabled/disabled
+        updateCommandsEnabled()
         
         // Set up auth panel with card layout
         setupAuthPanel()
@@ -153,32 +164,46 @@ class SshConnectionDialog(
             keyPanel.isVisible = useKeyCheckbox.isSelected
         }
         
-        // Make sudo password field enabled only when useSudo is checked and OS is Linux
-        updateSudoEnabled()
+        // Make commands field enabled only when runCommands is checked
+        updateCommandsEnabled()
         
-        useSudoCheckbox.addActionListener {
-            updateSudoEnabled()
+        runCommandsCheckbox.addActionListener {
+            updateCommandsEnabled()
         }
         
         linuxRadioButton.addActionListener {
-            updateSudoEnabled()
+            // Update suggested commands if OS type changes
+            updateCommandsPlaceholder()
         }
         
         windowsRadioButton.addActionListener {
-            updateSudoEnabled()
+            // Update suggested commands if OS type changes
+            updateCommandsPlaceholder()
         }
     }
     
-    private fun updateSudoEnabled() {
-        val isSudoAvailable = linuxRadioButton.isSelected
-        useSudoCheckbox.isEnabled = isSudoAvailable
+    private fun updateCommandsEnabled() {
+        val areCommandsEnabled = runCommandsCheckbox.isSelected
+        commandsTextArea.isEnabled = areCommandsEnabled
         
-        val isSudoEnabled = isSudoAvailable && useSudoCheckbox.isSelected
-        sudoPasswordField.isEnabled = isSudoEnabled
-        
-        if (!isSudoAvailable) {
-            useSudoCheckbox.isSelected = false
-            sudoPasswordField.isEnabled = false
+        // Update placeholder text based on OS type
+        updateCommandsPlaceholder()
+    }
+    
+    private fun updateCommandsPlaceholder() {
+        // Update placeholder text or sample commands based on OS type
+        if (!commandsTextArea.isEnabled || commandsTextArea.text.isBlank()) {
+            val osType = if (linuxRadioButton.isSelected) OsType.LINUX else OsType.WINDOWS
+            val placeholderText = when (osType) {
+                OsType.LINUX -> "# Example commands:\nsudo -s\ncd /var/www/html\nls -la"
+                OsType.WINDOWS -> "# Example commands:\ncd C:\\Users\\Administrator\\Documents\ndir"
+            }
+            
+            if (!commandsTextArea.isEnabled) {
+                commandsTextArea.text = ""
+            } else if (commandsTextArea.text.isBlank()) {
+                commandsTextArea.text = placeholderText
+            }
         }
     }
     
@@ -191,16 +216,23 @@ class SshConnectionDialog(
         osTypePanel.add(JBLabel("Server OS Type:"), BorderLayout.WEST)
         osTypePanel.add(osRadioButtonPanel, BorderLayout.CENTER)
         
-        // Create sudo panel with checkbox and password field
-        val sudoPanel = JPanel(BorderLayout())
-        sudoPanel.add(useSudoCheckbox, BorderLayout.NORTH)
+        // Create commands panel with checkbox and text area
+        val commandsPanel = JPanel(BorderLayout())
+        commandsPanel.add(runCommandsCheckbox, BorderLayout.NORTH)
         
+        val commandsTextPanel = JPanel(BorderLayout())
+        commandsTextPanel.add(JBLabel("Commands to run after connecting:"), BorderLayout.NORTH)
+        commandsScrollPane.preferredSize = Dimension(400, 100)
+        commandsTextPanel.add(commandsScrollPane, BorderLayout.CENTER)
+        commandsTextPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
+        
+        commandsPanel.add(commandsTextPanel, BorderLayout.CENTER)
+        
+        // Sudo password panel (kept for backward compatibility)
         val sudoPasswordPanel = JPanel(BorderLayout())
-        sudoPasswordPanel.add(JBLabel("Sudo Password (if user doesn't have sudo privileges):"), BorderLayout.WEST)
+        sudoPasswordPanel.add(JBLabel("Sudo Password:"), BorderLayout.WEST)
         sudoPasswordPanel.add(sudoPasswordField, BorderLayout.CENTER)
         sudoPasswordPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
-        
-        sudoPanel.add(sudoPasswordPanel, BorderLayout.CENTER)
         
         // Terminal options panel
         val terminalOptionsPanel = JPanel(BorderLayout())
@@ -217,7 +249,8 @@ class SshConnectionDialog(
             .addComponent(useKeyCheckbox)
             .addComponent(keyPanel)
             .addComponent(osTypePanel)
-            .addComponent(sudoPanel)
+            .addComponent(commandsPanel)
+            .addComponent(sudoPasswordPanel)
             .addComponent(terminalOptionsPanel)
             .addComponentFillVertically(JPanel(), 0)
             .panel
@@ -255,7 +288,10 @@ class SshConnectionDialog(
             return ValidationInfo("SSH key path is required when using key authentication", keyPathField)
         }
         
-        // We no longer require sudo password, even if sudo is enabled, as it might be the same as user password
+        // Validate commands if enabled
+        if (runCommandsCheckbox.isSelected && commandsTextArea.text.isBlank()) {
+            return ValidationInfo("Please enter at least one command to run or uncheck the option", commandsTextArea)
+        }
         
         return null
     }
@@ -265,7 +301,6 @@ class SshConnectionDialog(
      */
     fun createConnectionData(): SshConnectionData {
         val osType = if (linuxRadioButton.isSelected) OsType.LINUX else OsType.WINDOWS
-        val useSudo = useSudoCheckbox.isSelected && osType == OsType.LINUX
         val useKey = useKeyCheckbox.isSelected
         
         return SshConnectionData(
@@ -276,10 +311,11 @@ class SshConnectionDialog(
             username = usernameField.text,
             encodedPassword = passwordField.password.joinToString(""),
             osType = osType,
-            useSudo = useSudo,
-            // Only use separate sudo password if provided (otherwise system will use user password)
-            encodedSudoPassword = if (useSudo && sudoPasswordField.password.isNotEmpty()) 
-                                    sudoPasswordField.password.joinToString("") 
+            runCommands = runCommandsCheckbox.isSelected,
+            commands = if (runCommandsCheckbox.isSelected) commandsTextArea.text else "",
+            // Store sudo password if provided
+            encodedSudoPassword = if (sudoPasswordField.password.isNotEmpty())
+                                    sudoPasswordField.password.joinToString("")
                                   else null,
             useKey = useKey,
             keyPath = if (useKey) keyPathField.text else "",
