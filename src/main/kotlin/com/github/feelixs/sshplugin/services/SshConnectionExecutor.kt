@@ -270,14 +270,13 @@ class SshConnectionExecutor(private val project: Project) {
                     // Log any errors that occur during the async process
                     logger.error("Error in background handling thread for ${connectionData.alias}", e)
                 }
+
+                showNotification(
+                    project,
+                    "SSH for ${connectionData.alias}: successful",
+                    NotificationType.INFORMATION
+                )
             }.start()
-
-            showNotification(
-                project,
-                "SSH for ${connectionData.alias}: successful",
-                NotificationType.INFORMATION
-            )
-
         } else {
             println("No background handling needed (no key passphrase or sudo) for ${connectionData.alias}")
         }
