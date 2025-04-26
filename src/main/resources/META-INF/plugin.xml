@@ -19,7 +19,7 @@
         <!-- Define the tool window -->
         <toolWindow
                 id="SSH Connections"
-                anchor="bottom"
+                anchor="left"
                 icon="icons/cloud.svg"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
                 
