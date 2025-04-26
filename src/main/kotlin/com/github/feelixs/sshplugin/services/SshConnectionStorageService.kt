@@ -228,7 +228,7 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         }
         
         // Add the username and host
-        sshCommand.append("${connection.username}@${connection.host}")
+        sshCommand.append("${connection.username}@${connection.host} -o StrictHostKeyChecking=no")
         
         // Note: Passwords are not included in the command as they would be handled by the SSH client
         // or through other secure methods like an agent or passphrase prompt
