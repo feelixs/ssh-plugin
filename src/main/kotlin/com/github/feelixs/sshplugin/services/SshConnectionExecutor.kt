@@ -220,9 +220,8 @@ class SshConnectionExecutor(private val project: Project) {
 
                                             var pswd = connectionData.encodedSudoPassword
                                             if (connectionData.useUserPasswordForSudo) {
-                                                pswd = connectionData.encodedSudoPassword
+                                                pswd = connectionData.encodedPassword
                                             }
-
                                             terminal.sendCommandToExecute("${pswd}\n")
                                             Thread.sleep(sudoPromptDelay)
                                         } else {
