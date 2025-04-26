@@ -17,7 +17,7 @@ data class SshConnectionData(
     @Attribute("runCommands") var runCommands: Boolean = false, // Whether to run commands after connection
     @Attribute("commands") var commands: String = "", // Commands to run after successful connection
     var encodedSudoPassword: String? = null, // Placeholder for securely stored sudo password (kept for backwards compatibility)
-    var useUserPasswordForSudo: Boolean = false, // Whether to use the user password for sudo commands
+    @Attribute("useUserPasswordForSudo") var useUserPasswordForSudo: Boolean = false, // Whether to use the user password for sudo commands
     @Attribute("useKey") var useKey: Boolean = false, // Whether to use SSH key authentication
     @Attribute("keyPath") var keyPath: String = "", // Path to the SSH key file
     var encodedKeyPassword: String? = null, // Placeholder for securely stored key password
