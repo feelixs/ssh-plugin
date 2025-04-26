@@ -205,16 +205,22 @@ class SshConnectionExecutor(private val project: Project) {
                                 // Skip comment lines
                                 if (!command.startsWith("#") && !shouldbreak) {
                                     println("Executing command: $command")
-                                    terminal.sendCommandToExecute("$command\n")
+                                    terminal.sendCommandToExecute(command)
 
                                     // If this is a sudo command, it may need password
                                     if (command.trim().startsWith("sudo") && connectionData.osType == OsType.LINUX) {
                                         // Send appropriate sudo password if we have one
-                                        if (!connectionData.encodedSudoPassword.isNullOrEmpty()) {
+                                        if (!connectionData.encodedSudoPassword.isNullOrEmpty() || (connectionData.useUserPasswordForSudo && !connectionData.encodedPassword.isNullOrEmpty())) {
                                             println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
                                             Thread.sleep(sudoPromptDelay)
                                             println("Sending sudo password")
-                                            terminal.sendCommandToExecute("${connectionData.encodedSudoPassword}\n")
+
+                                            var pswd = connectionData.encodedSudoPassword
+                                            if (connectionData.useUserPasswordForSudo) {
+                                                pswd = connectionData.encodedSudoPassword
+                                            }
+
+                                            terminal.sendCommandToExecute("${pswd}\n")
                                             Thread.sleep(sudoPromptDelay)
                                         } else {
                                             println("No passwords provided")

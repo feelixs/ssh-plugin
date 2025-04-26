@@ -83,7 +83,9 @@ class SshConnectionDialog(
     }
     private val commandsScrollPane = JBScrollPane(commandsTextArea)
     
-    // Sudo password (kept for backward compatibility)
+    // Sudo password and options
+    private val useUserPasswordForSudoCheckbox = JBCheckBox("Use user password for sudo commands", 
+        existingConnection?.useUserPasswordForSudo ?: false)
     private val sudoPasswordField = JBPasswordField()
     
     // Terminal options
@@ -171,6 +173,13 @@ class SshConnectionDialog(
             updateCommandsEnabled()
         }
         
+        // Update sudo password field state based on checkbox
+        updateSudoPasswordEnabled()
+        
+        useUserPasswordForSudoCheckbox.addActionListener {
+            updateSudoPasswordEnabled()
+        }
+        
         linuxRadioButton.addActionListener {
             // Update suggested commands if OS type changes
             updateCommandsPlaceholder()
@@ -180,6 +189,11 @@ class SshConnectionDialog(
             // Update suggested commands if OS type changes
             updateCommandsPlaceholder()
         }
+    }
+    
+    private fun updateSudoPasswordEnabled() {
+        // Disable sudo password field if using user password for sudo
+        sudoPasswordField.isEnabled = !useUserPasswordForSudoCheckbox.isSelected
     }
     
     private fun updateCommandsEnabled() {
@@ -228,11 +242,16 @@ class SshConnectionDialog(
         
         commandsPanel.add(commandsTextPanel, BorderLayout.CENTER)
         
-        // Sudo password panel (kept for backward compatibility)
+        // Sudo password panel with checkbox for using user password
+        val sudoPanel = JPanel(BorderLayout())
+        sudoPanel.add(useUserPasswordForSudoCheckbox, BorderLayout.NORTH)
+        
         val sudoPasswordPanel = JPanel(BorderLayout())
-        sudoPasswordPanel.add(JBLabel("Sudo Password:"), BorderLayout.WEST)
+        sudoPasswordPanel.add(JBLabel("Sudo Password (if needed):"), BorderLayout.WEST)
         sudoPasswordPanel.add(sudoPasswordField, BorderLayout.CENTER)
         sudoPasswordPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
+        
+        sudoPanel.add(sudoPasswordPanel, BorderLayout.CENTER)
         
         // Terminal options panel
         val terminalOptionsPanel = JPanel(BorderLayout())
@@ -250,7 +269,7 @@ class SshConnectionDialog(
             .addComponent(keyPanel)
             .addComponent(osTypePanel)
             .addComponent(commandsPanel)
-            .addComponent(sudoPasswordPanel)
+            .addComponent(sudoPanel)
             .addComponent(terminalOptionsPanel)
             .addComponentFillVertically(JPanel(), 0)
             .panel
