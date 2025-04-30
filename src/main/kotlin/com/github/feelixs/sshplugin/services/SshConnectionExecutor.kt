@@ -279,6 +279,11 @@ class SshConnectionExecutor(private val project: Project) {
             }.start()
         } else {
             println("No background handling needed (no key passphrase or sudo) for ${connectionData.alias}")
+            showNotification(
+                project,
+                "No password was provided for ${connectionData.alias}! You'll need to enter it manually.",
+                NotificationType.WARNING
+            )
         }
 
         return true
