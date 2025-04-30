@@ -10,8 +10,8 @@
 A comprehensive SSH password manager which securely initiates SSH connections to the IDE's terminal using your saved, encoded passwords. Features include:
 
 - Store all your SSH-key passwords in an easily accessible tool window.
-- Run the plugin's "SSH Connector" IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
-- Run the "Connect" button to initiate SSH to the selected connection.
+- Run the plugin's SSH Connector IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
+- Run the Connect button to initiate SSH to the selected connection.
 <!-- Plugin description end -->
 
 ## Template ToDo list

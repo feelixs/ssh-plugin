@@ -160,7 +160,7 @@ class SshConnectionExecutor(private val project: Project) {
         //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and custom commands in a background thread to avoid blocking the UI
         if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
-            (connectionData.runCommands && connectionData.commands.isNotBlank())) {
+            (!connectionData.encodedPassword.isNullOrEmpty())) {
             
             println("Starting background thread for timed password automation for ${connectionData.alias}")
 
@@ -171,76 +171,93 @@ class SshConnectionExecutor(private val project: Project) {
                     val initialDelay = 3000L        // Wait for SSH to start and possibly show passphrase prompt
                     val sshEstablishDelay = 3000L   // Wait for SSH connection to establish
                     val sudoPromptDelay = 1500L     // Wait for sudo prompt to appear
-                    
+
+                    var shouldbreak = false
+
                     // Handle key passphrase if needed (enter after initial delay)
                     if (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) {
                         println("Waiting ${initialDelay}ms for potential key passphrase prompt")
                         Thread.sleep(initialDelay)
-                        
+
                         connectionData.encodedKeyPassword?.let { keyPassword ->
                             println("Sending key passphrase after timed delay")
                             terminal.sendCommandToExecute("$keyPassword\n")
                         }
+                    } else if (!connectionData.encodedPassword.isNullOrEmpty()) {
+                        println("Using user password (no passkey setup)")
+                        println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
+                        Thread.sleep(sudoPromptDelay)
+                        println("Sending user password")
+                        terminal.sendCommandToExecute("${connectionData.encodedPassword}\n")
+                        Thread.sleep(sudoPromptDelay)
+
+                    } else {
+                        shouldbreak = true
+                        showNotification(
+                            project,
+                            "No password provided for ${connectionData.alias}, exiting control to user!",
+                            NotificationType.WARNING
+                        )
                     }
-                    
-                    // Handle commands to run after successful connection
-                    if (connectionData.runCommands && connectionData.commands.isNotBlank()) {
-                        // Wait for SSH connection to fully establish before running commands
-                        println("Waiting ${sshEstablishDelay}ms for SSH connection to establish")
-                        Thread.sleep(sshEstablishDelay)
-                    }
-                    Thread.sleep(sudoPromptDelay)
-                    println("Timed password automation completed for ${connectionData.alias}")
-                    if (connectionData.maximizeTerminal) {
-                        terminalToolWindow?.activate {
-                            toolWindowManager.setMaximized(terminalToolWindow, true)
+                    if (!shouldbreak) {
+                        if (connectionData.maximizeTerminal) {
+                            terminalToolWindow?.activate {
+                                toolWindowManager.setMaximized(terminalToolWindow, true)
+                            }
                         }
-                    }
-                    IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
-                    //temp.sendCommandToExecute("\u0004")  //exit temp window
-                    Thread.sleep(sudoPromptDelay)
+                        IdeFocusManager.getInstance(project).requestFocus(terminal.component, true)
 
-                    // Execute each command line by line
-                    if (connectionData.commands.isNotBlank()) {
-                        showNotification(project, "Sending user-defined startup commands...", NotificationType.INFORMATION)
-                        val commands = connectionData.commands.split("\n")
-                        var shouldbreak = false
-                        commands.forEach { command ->
-                            if (command.isNotBlank()) {
-                                // Skip comment lines
-                                if (!command.startsWith("#") && !shouldbreak) {
-                                    println("Executing command: $command")
-                                    terminal.sendCommandToExecute(command)
+                        // Handle commands to run after successful connection
+                        if (connectionData.runCommands && connectionData.commands.isNotBlank()) {
+                            showNotification(
+                                project,
+                                "You have configured some user-defined commands. Please don't enter anything into the terminal until they have been executed...",
+                                NotificationType.WARNING
+                            )
+                            // Wait for SSH connection to fully establish before running commands
+                            println("Waiting ${sshEstablishDelay}ms for SSH connection to establish")
+                            Thread.sleep(sshEstablishDelay)
 
-                                    // If this is a sudo command, it may need password
-                                    if (command.trim().startsWith("sudo") && connectionData.osType == OsType.LINUX) {
-                                        // Send appropriate sudo password if we have one
-                                        println(!connectionData.encodedSudoPassword.isNullOrEmpty())
-                                        println(connectionData.useUserPasswordForSudo)
-                                        println(!connectionData.encodedPassword.isNullOrEmpty())
-                                        if (!connectionData.encodedSudoPassword.isNullOrEmpty() || (connectionData.useUserPasswordForSudo && !connectionData.encodedPassword.isNullOrEmpty())) {
-                                            println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
-                                            Thread.sleep(sudoPromptDelay)
-                                            println("Sending sudo password")
+                            val commands = connectionData.commands.split("\n")
+                            commands.forEach { command ->
+                                if (command.isNotBlank()) {
+                                    // Skip comment lines
+                                    if (!command.startsWith("#") && !shouldbreak) {
+                                        println("Executing command: $command")
+                                        terminal.sendCommandToExecute(command)
 
-                                            var pswd = connectionData.encodedSudoPassword
-                                            if (connectionData.useUserPasswordForSudo) {
-                                                pswd = connectionData.encodedPassword
+                                        // If this is a sudo command, it may need password
+                                        if (command.trim()
+                                                .startsWith("sudo") && connectionData.osType == OsType.LINUX
+                                        ) {
+                                            // Send appropriate sudo password if we have one
+                                            println(!connectionData.encodedSudoPassword.isNullOrEmpty())
+                                            println(connectionData.useUserPasswordForSudo)
+                                            println(!connectionData.encodedPassword.isNullOrEmpty())
+                                            if (!connectionData.encodedSudoPassword.isNullOrEmpty() || (connectionData.useUserPasswordForSudo && !connectionData.encodedPassword.isNullOrEmpty())) {
+                                                println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
+                                                Thread.sleep(sudoPromptDelay)
+                                                println("Sending sudo password")
+
+                                                var pswd = connectionData.encodedSudoPassword
+                                                if (connectionData.useUserPasswordForSudo) {
+                                                    pswd = connectionData.encodedPassword
+                                                }
+                                                terminal.sendCommandToExecute("${pswd}\n")
+                                                Thread.sleep(sudoPromptDelay)
+                                            } else {
+                                                println("No passwords provided")
+                                                showNotification(
+                                                    project,
+                                                    "No SUDO password provided, but a SUDO command was defined in startup commands.\nCancelling the rest...",
+                                                    NotificationType.WARNING
+                                                )
+                                                shouldbreak = true
                                             }
-                                            terminal.sendCommandToExecute("${pswd}\n")
-                                            Thread.sleep(sudoPromptDelay)
                                         } else {
-                                            println("No passwords provided")
-                                            showNotification(
-                                                project,
-                                                "No SUDO password provided, but a SUDO command was defined in startup commands.\nCancelling the rest...",
-                                                NotificationType.WARNING
-                                            )
-                                            shouldbreak = true
+                                            // Short delay between commands for better reliability
+                                            Thread.sleep(1000L)
                                         }
-                                    } else {
-                                        // Short delay between commands for better reliability
-                                        Thread.sleep(1000L)
                                     }
                                 }
                             }
@@ -253,15 +270,20 @@ class SshConnectionExecutor(private val project: Project) {
                     // Log any errors that occur during the async process
                     logger.error("Error in background handling thread for ${connectionData.alias}", e)
                 }
-            }.start()
 
-            showNotification(
-                project,
-                "SSH for ${connectionData.alias}: successful",
-                NotificationType.INFORMATION
-            )
+                showNotification(
+                    project,
+                    "SSH for ${connectionData.alias}: successful",
+                    NotificationType.INFORMATION
+                )
+            }.start()
         } else {
             println("No background handling needed (no key passphrase or sudo) for ${connectionData.alias}")
+            showNotification(
+                project,
+                "No password was provided for ${connectionData.alias}! You'll need to enter it manually.",
+                NotificationType.WARNING
+            )
         }
 
         return true
