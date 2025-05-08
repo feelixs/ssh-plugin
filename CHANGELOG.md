@@ -4,7 +4,7 @@
 
 ## 0.1.6
 ### Added
-- Fix bug where password isn't copied when you copy a profile
+- Fix bug where password isn't saved
 
 ## 0.1.5
 ### Added
