@@ -170,7 +170,11 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
                 // Create a clone with a new ID and modified alias
                 val duplicatedConnection = connectionWithPasswords.copy(
                     id = java.util.UUID.randomUUID().toString(),
-                    alias = "Copy of ${connectionWithPasswords.alias}"
+                    alias = "Copy of ${connectionWithPasswords.alias}",
+                    // Ensure all password fields are correctly copied
+                    encodedPassword = connectionWithPasswords.encodedPassword,
+                    encodedSudoPassword = connectionWithPasswords.encodedSudoPassword,
+                    encodedKeyPassword = connectionWithPasswords.encodedKeyPassword
                 )
                 
                 // Add the duplicated connection

@@ -49,7 +49,8 @@ class CopySudoPasswordAction : AnAction(AllIcons.Actions.Copy), DumbAware {
             val userPassword = connectionWithPasswords.encodedPassword ?: ""
             val stringSelection = StringSelection(userPassword)
             CopyPasteManager.getInstance().setContents(stringSelection)
-            passwordType = if (userPassword.isBlank()) "Empty password" else "User password"
+            // Check if the userPassword is empty before selecting the notification type
+            passwordType = if (userPassword.isEmpty()) "Empty password" else "User password"
         }
         
         // Show success notification

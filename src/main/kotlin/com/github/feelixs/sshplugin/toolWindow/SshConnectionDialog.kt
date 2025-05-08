@@ -328,17 +328,22 @@ class SshConnectionDialog(
             host = hostField.text,
             port = portField.text.toInt(),
             username = usernameField.text,
-            encodedPassword = passwordField.password.joinToString(""),
+            encodedPassword = if (passwordField.password.isNotEmpty())
+                                passwordField.password.joinToString("")
+                              else existingConnection?.encodedPassword,
             osType = osType,
             runCommands = runCommandsCheckbox.isSelected,
             commands = if (runCommandsCheckbox.isSelected) commandsTextArea.text else "",
-            // Store sudo password if provided
+            // Store sudo password if provided, regardless of runCommands setting
             encodedSudoPassword = if (sudoPasswordField.password.isNotEmpty())
                                     sudoPasswordField.password.joinToString("")
-                                  else null,
+                                  else existingConnection?.encodedSudoPassword,
             useKey = useKey,
             keyPath = if (useKey) keyPathField.text else "",
-            encodedKeyPassword = if (useKey) keyPasswordField.password.joinToString("") else null,
+            encodedKeyPassword = if (useKey && keyPasswordField.password.isNotEmpty())
+                                   keyPasswordField.password.joinToString("")
+                                 else if (useKey) existingConnection?.encodedKeyPassword
+                                 else null,
             useUserPasswordForSudo = useUserPasswordForSudoCheckbox.isSelected,
             maximizeTerminal = maximizeTerminalCheckbox.isSelected
         )
