@@ -2,6 +2,10 @@
 
 # ssh-plugin Changelog
 
+## 0.1.6
+### Added
+- Fix bug where password isn't copied when you copy a profile
+
 ## 0.1.5
 ### Added
 - Notification when no password exists for the connection.
