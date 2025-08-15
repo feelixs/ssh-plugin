@@ -201,14 +201,14 @@ jobs:
 
       # Generate the list that the cache key depends on
       - name: Generate Plugin Verifier Product List
-        run: ./gradlew listProductsReleases
+        run: ./gradlew printProductsReleases
 
       # Cache Plugin Verifier IDEs
       - name: Setup Plugin Verifier IDEs Cache
         uses: actions/cache@v4
         with:
           path: ${{ needs.build.outputs.pluginVerifierHomeDir }}/ides
-          key: plugin-verifier-${{ hashFiles('build/listProductsReleases.txt') }}
+          key: plugin-verifier-${{ hashFiles('build/printProductsReleases.txt') }}
 
       # Run Verify Plugin task and IntelliJ Plugin Verifier tool
       - name: Run Plugin Verification tasks
