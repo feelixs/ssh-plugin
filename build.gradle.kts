@@ -107,9 +107,7 @@ intellijPlatform {
 
     pluginVerification {
         ides {
-            // Use specific IDE versions instead of recommended() to avoid missing versions
-            ide("IC", "2024.3")
-            ide("IC", "2025.1")
+            recommended()
         }
     }
 }
