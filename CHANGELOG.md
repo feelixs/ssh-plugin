@@ -2,14 +2,32 @@
 
 # ssh-plugin Changelog
 
-## 0.1.6
+## [0.1.9]
+
 ### Added
+
+- Increase delay before password entry
+
+
+## [0.1.8]
+
+### Added
+
+- Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
+
+## [0.1.6]
+
+### Added
+
 - Fix bug where password isn't saved
 
-## 0.1.5
+## [0.1.5]
+
 ### Added
+
 - Notification when no password exists for the connection.
 
-## [Unreleased]
-### Added
-- Initial scaffold created from [IntelliJ Platform Plugin Template](https://github.com/JetBrains/intellij-platform-plugin-template)
+[Unreleased]: https://github.com/feelixs/ssh-plugin/compare/v0.1.8...HEAD
+[0.1.8]: https://github.com/feelixs/ssh-plugin/compare/v0.1.6...v0.1.8
+[0.1.6]: https://github.com/feelixs/ssh-plugin/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/feelixs/ssh-plugin/commits/v0.1.5
