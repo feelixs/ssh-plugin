@@ -168,7 +168,7 @@ class SshConnectionExecutor(private val project: Project) {
             Thread {
                 try {
                     // Fixed timing delays for authentication steps
-                    val initialDelay = 3000L        // Wait for SSH to start and possibly show passphrase prompt
+                    val initialDelay = 6000L        // Wait for SSH to start and possibly show passphrase prompt
                     val sshEstablishDelay = 3000L   // Wait for SSH connection to establish
                     val sudoPromptDelay = 1500L     // Wait for sudo prompt to appear
 
