@@ -4,6 +4,18 @@
 
 ## [Unreleased]
 
+## [0.2.0]
+
+### Added
+
+- Show/hide password toggle (eye icon) on all password fields
+- Startup commands now run even when no password is defined
+- MIT License and EULA
+
+### Fixed
+
+- Removed misleading "no password provided" warning for passwordless connections
+
 ## [0.1.9]
 
 ### Added
@@ -28,7 +40,8 @@
 
 - Notification when no password exists for the connection.
 
-[Unreleased]: https://github.com/feelixs/ssh-plugin/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/feelixs/ssh-plugin/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/feelixs/ssh-plugin/compare/v0.1.9...v0.2.0
 [0.1.9]: https://github.com/feelixs/ssh-plugin/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/feelixs/ssh-plugin/compare/v0.1.6...v0.1.8
 [0.1.6]: https://github.com/feelixs/ssh-plugin/compare/v0.1.5...v0.1.6
