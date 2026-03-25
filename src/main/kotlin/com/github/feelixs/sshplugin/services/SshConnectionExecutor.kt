@@ -159,8 +159,10 @@ class SshConnectionExecutor(private val project: Project) {
         )
         //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and custom commands in a background thread to avoid blocking the UI
-        if ((connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) || 
-            (!connectionData.encodedPassword.isNullOrEmpty())) {
+        val hasPassword = (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) ||
+            (!connectionData.encodedPassword.isNullOrEmpty())
+        val hasCommands = connectionData.runCommands && connectionData.commands.isNotBlank()
+        if (hasPassword || hasCommands) {
             
             println("Starting background thread for timed password automation for ${connectionData.alias}")
 
@@ -191,12 +193,9 @@ class SshConnectionExecutor(private val project: Project) {
                         terminal.sendCommandToExecute("${connectionData.encodedPassword}\n")
                         Thread.sleep(sudoPromptDelay)
                     } else {
-                        shouldbreak = true
-                        showNotification(
-                            project,
-                            "No password provided for ${connectionData.alias}, exiting control to user!",
-                            NotificationType.WARNING
-                        )
+                        // No password but has commands - wait for SSH to connect (e.g. key-based auth without passphrase)
+                        println("No password, waiting ${initialDelay}ms for SSH connection to establish")
+                        Thread.sleep(initialDelay)
                     }
                     if (!shouldbreak) {
                         if (connectionData.maximizeTerminal) {
@@ -277,12 +276,7 @@ class SshConnectionExecutor(private val project: Project) {
                 )
             }.start()
         } else {
-            println("No background handling needed (no key passphrase or sudo) for ${connectionData.alias}")
-            showNotification(
-                project,
-                "No password was provided for ${connectionData.alias}! You'll need to enter it manually.",
-                NotificationType.WARNING
-            )
+            println("No background handling needed (no password or commands) for ${connectionData.alias}")
         }
 
         return true
