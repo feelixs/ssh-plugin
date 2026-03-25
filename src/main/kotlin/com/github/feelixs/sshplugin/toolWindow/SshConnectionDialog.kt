@@ -7,6 +7,7 @@ import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.DialogWrapper
 import com.intellij.openapi.ui.TextFieldWithBrowseButton
 import com.intellij.openapi.ui.ValidationInfo
+import com.intellij.openapi.util.IconLoader
 import com.intellij.ui.components.JBCheckBox
 import com.intellij.ui.components.JBLabel
 import com.intellij.ui.components.JBPasswordField
@@ -89,8 +90,38 @@ class SshConnectionDialog(
     private val sudoPasswordField = JBPasswordField()
     
     // Terminal options
-    private val maximizeTerminalCheckbox = JBCheckBox("Maximize terminal window on connect", 
+    private val maximizeTerminalCheckbox = JBCheckBox("Maximize terminal window on connect",
         existingConnection?.maximizeTerminal ?: false)
+
+    companion object {
+        private val EYE_ICON = IconLoader.getIcon("/icons/eye.svg", SshConnectionDialog::class.java)
+        private val EYE_CROSSED_ICON = IconLoader.getIcon("/icons/eyeCrossed.svg", SshConnectionDialog::class.java)
+    }
+
+    private fun createPasswordFieldWithToggle(field: JBPasswordField): JPanel {
+        val panel = JPanel(BorderLayout())
+        val originalEchoChar = field.echoChar
+        val toggleButton = JButton(EYE_ICON).apply {
+            isFocusable = false
+            toolTipText = "Show password"
+            border = BorderFactory.createEmptyBorder()
+            isContentAreaFilled = false
+            addActionListener {
+                if (field.echoChar == 0.toChar()) {
+                    field.echoChar = originalEchoChar
+                    icon = EYE_ICON
+                    toolTipText = "Show password"
+                } else {
+                    field.echoChar = 0.toChar()
+                    icon = EYE_CROSSED_ICON
+                    toolTipText = "Hide password"
+                }
+            }
+        }
+        panel.add(field, BorderLayout.CENTER)
+        panel.add(toggleButton, BorderLayout.EAST)
+        return panel
+    }
     
     init {
         title = if (existingConnection == null) "Add SSH Connection" else "Edit SSH Connection"
@@ -148,7 +179,7 @@ class SshConnectionDialog(
         keyPanel.add(keyPathField)
         keyPanel.add(Box.createVerticalStrut(5))
         keyPanel.add(keyPasswordLabelPanel)
-        keyPanel.add(keyPasswordField)
+        keyPanel.add(createPasswordFieldWithToggle(keyPasswordField))
         
         // Set initial visibility based on existing connection
         if (existingConnection != null && existingConnection.useKey) {
@@ -248,7 +279,7 @@ class SshConnectionDialog(
         
         val sudoPasswordPanel = JPanel(BorderLayout())
         sudoPasswordPanel.add(JBLabel("Sudo Password (if needed):"), BorderLayout.WEST)
-        sudoPasswordPanel.add(sudoPasswordField, BorderLayout.CENTER)
+        sudoPasswordPanel.add(createPasswordFieldWithToggle(sudoPasswordField), BorderLayout.CENTER)
         sudoPasswordPanel.border = JBUI.Borders.empty(5, 20, 0, 0)
         
         sudoPanel.add(sudoPasswordPanel, BorderLayout.CENTER)
@@ -264,7 +295,7 @@ class SshConnectionDialog(
             .addLabeledComponent("Host:", hostField)
             .addLabeledComponent("Port:", portField)
             .addLabeledComponent("Username:", usernameField)
-            .addLabeledComponent("Password:", passwordField)
+            .addLabeledComponent("Password:", createPasswordFieldWithToggle(passwordField))
             .addComponent(useKeyCheckbox)
             .addComponent(keyPanel)
             .addComponent(osTypePanel)
