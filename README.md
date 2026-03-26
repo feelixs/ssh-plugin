@@ -7,24 +7,12 @@
 ## About
 
 <!-- Plugin description -->
-A comprehensive SSH password manager which securely initiates SSH connections to the IDE's terminal using your saved, encoded passwords. Features include:
-
-- Store all your SSH-key passwords in an easily accessible tool window.
-- Run the plugin's SSH Connector IDE action to view all your SSH keys in a list. Click on an entry to view more info about it.
-- Run the Connect button to initiate SSH to the selected connection.
+Adds a toolbar to the IDE where you can store your SSH connection details, and easily initiate SSH Connections to them using the IDE integrated terminal.
+- Store your connection details (host, password/key, etc) across IDE sessions.
+- Automate your login workflow with "On Connect" initialization commands.
+- Connect to your remote servers in one click!
 <!-- Plugin description end -->
 
-## Template ToDo list
-- [x] Create a new [IntelliJ Platform Plugin Template][template] project.
-- [ ] Get familiar with the [template documentation][template].
-- [ ] Adjust the [pluginGroup](./gradle.properties) and [pluginName](./gradle.properties), as well as the [id](./src/main/resources/META-INF/plugin.xml) and [sources package](./src/main/kotlin).
-- [x] Adjust the plugin description in `README` (see [Tips][docs:plugin-description])
-- [ ] Review the [Legal Agreements](https://plugins.jetbrains.com/docs/marketplace/legal-agreements.html?from=IJPluginTemplate).
-- [x] [Publish a plugin manually](https://plugins.jetbrains.com/docs/intellij/publishing-plugin.html?from=IJPluginTemplate) for the first time.
-- [x] Set the `MARKETPLACE_ID` in the above README badges. You can obtain it once the plugin is published to JetBrains Marketplace.
-- [ ] Set the [Plugin Signing](https://plugins.jetbrains.com/docs/intellij/plugin-signing.html?from=IJPluginTemplate) related [secrets](https://github.com/JetBrains/intellij-platform-plugin-template#environment-variables).
-- [ ] Set the [Deployment Token](https://plugins.jetbrains.com/docs/marketplace/plugin-upload.html?from=IJPluginTemplate).
-- [ ] Click the <kbd>Watch</kbd> button on the top of the [IntelliJ Platform Plugin Template][template] to be notified about releases containing new features and fixes.
 
 ## Installation
 
@@ -45,6 +33,17 @@ A comprehensive SSH password manager which securely initiates SSH connections to
   Download the [latest release](https://github.com/feelixs/ssh-plugin/releases/latest) and install it manually using
   <kbd>Settings/Preferences</kbd> > <kbd>Plugins</kbd> > <kbd>⚙️</kbd> > <kbd>Install plugin from disk...</kbd>
 
+
+## Using the Plugin
+
+1. Launch your IDE and install the plugin. It may prompt you to restart the IDE<br>
+2. Navigate to the SSH Connections tab on the left bar<br>
+   <img src="https://github.com/feelixs/ssh-plugin/blob/main/img/step1.PNG?raw=true"><br>
+3. Click 'Add Connection' and enter your details. Press OK, and the IDE will remember these details across sessions.<br>
+   <img src="https://github.com/feelixs/ssh-plugin/blob/main/img/step2.PNG?raw=true"><br>
+4. With your newly added connection selected in the SSH Connection toolbar, press Connect<br>
+   <img src="https://github.com/feelixs/ssh-plugin/blob/main/img/step3.PNG?raw=true"><br>
+5. Now you can initiate a Terminal session to your SSH connection in a single click!
 
 ---
 Plugin based on the [IntelliJ Platform Plugin Template][template].
