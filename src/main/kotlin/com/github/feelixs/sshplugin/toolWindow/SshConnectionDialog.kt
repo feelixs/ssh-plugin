@@ -192,9 +192,11 @@ class SshConnectionDialog(
     }
     
     private fun setupEventListeners() {
-        // Toggle SSH key panel visibility
+        // Toggle SSH key panel visibility and disable user password when using key auth
+        updatePasswordFieldEnabled()
         useKeyCheckbox.addActionListener {
             keyPanel.isVisible = useKeyCheckbox.isSelected
+            updatePasswordFieldEnabled()
         }
         
         // Make commands field enabled only when runCommands is checked
@@ -222,6 +224,14 @@ class SshConnectionDialog(
         }
     }
     
+    private fun updatePasswordFieldEnabled() {
+        val keyAuth = useKeyCheckbox.isSelected
+        passwordField.isEnabled = !keyAuth
+        if (keyAuth) {
+            passwordField.text = ""
+        }
+    }
+
     private fun updateSudoPasswordEnabled() {
         // Disable sudo password field if using user password for sudo
         sudoPasswordField.isEnabled = !useUserPasswordForSudoCheckbox.isSelected
@@ -359,7 +369,8 @@ class SshConnectionDialog(
             host = hostField.text,
             port = portField.text.toInt(),
             username = usernameField.text,
-            encodedPassword = if (passwordField.password.isNotEmpty())
+            encodedPassword = if (useKey) null
+                              else if (passwordField.password.isNotEmpty())
                                 passwordField.password.joinToString("")
                               else existingConnection?.encodedPassword,
             osType = osType,
