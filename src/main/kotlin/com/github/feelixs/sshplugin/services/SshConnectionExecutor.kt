@@ -160,7 +160,7 @@ class SshConnectionExecutor(private val project: Project) {
         //temp.sendCommandToExecute("printf \"\\033[32mSSH \n\n\n\n\n\n\n\n\n\n\n\n\n\nInitializing SSH for: ${connectionData.alias} - please wait...\n\n\n\\033[0m\\n\"")
         // Handle SSH key passphrase and custom commands in a background thread to avoid blocking the UI
         val hasPassword = (connectionData.useKey && !connectionData.encodedKeyPassword.isNullOrEmpty()) ||
-            (!connectionData.encodedPassword.isNullOrEmpty())
+            (!connectionData.useKey && !connectionData.encodedPassword.isNullOrEmpty())
         val hasCommands = connectionData.runCommands && connectionData.commands.isNotBlank()
         if (hasPassword || hasCommands) {
             
@@ -185,7 +185,7 @@ class SshConnectionExecutor(private val project: Project) {
                             println("Sending key passphrase after timed delay")
                             terminal.sendCommandToExecute("$keyPassword\n")
                         }
-                    } else if (!connectionData.encodedPassword.isNullOrEmpty()) {
+                    } else if (!connectionData.useKey && !connectionData.encodedPassword.isNullOrEmpty()) {
                         println("Using user password (no passkey setup)")
                         println("Waiting ${sudoPromptDelay}ms for potential sudo password prompt")
                         Thread.sleep(sudoPromptDelay)
