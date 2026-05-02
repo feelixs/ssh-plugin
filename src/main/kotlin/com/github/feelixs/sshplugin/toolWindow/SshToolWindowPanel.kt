@@ -56,6 +56,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         val scrollPane = JBScrollPane(tree)
         setContent(scrollPane)
         installPopupMenu()
+        installDnD()
     }
 
     /**
@@ -316,6 +317,125 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         com.intellij.ui.PopupHandler.installPopupMenu(
             tree, popupGroup, "SSHPluginToolWindowPopup"
         )
+    }
+
+    private fun installDnD() {
+        com.intellij.ide.dnd.DnDSupport.createBuilder(tree)
+            .setBeanProvider { info ->
+                val path = tree.getPathForLocation(info.point.x, info.point.y) ?: return@setBeanProvider null
+                val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return@setBeanProvider null
+                when (val obj = node.userObject) {
+                    is SshConnectionData -> com.intellij.ide.dnd.DnDDragStartBean(DraggedConnection(obj.id))
+                    is SshFolder -> com.intellij.ide.dnd.DnDDragStartBean(DraggedFolder(obj.id))
+                    else -> null
+                }
+            }
+            .setTargetChecker { event ->
+                val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject)
+                event.isDropPossible = target != null
+                true
+            }
+            .setDropHandler { event ->
+                val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject) ?: return@setDropHandler
+                applyDrop(event.attachedObject, target)
+                reloadTree()
+            }
+            .install()
+    }
+
+    private data class DraggedConnection(val id: String)
+    private data class DraggedFolder(val id: String)
+
+    /**
+     * What a drop should do, computed from the drop point and dragged payload.
+     */
+    private sealed class DropTarget {
+        /** Move connection into a folder; if [insertBeforeConnectionId] is non-null, insert just before it; else append to end of folder's contents. */
+        data class MoveConnectionToFolder(val connectionId: String, val folderId: String, val insertBeforeConnectionId: String? = null) : DropTarget()
+        /** Move connection to root; if [insertBeforeConnectionId] is non-null, insert just before it; else append. */
+        data class MoveConnectionToRoot(val connectionId: String, val insertBeforeConnectionId: String? = null) : DropTarget()
+        data class ReorderFolderTo(val folderId: String, val newIndex: Int) : DropTarget()
+    }
+
+    private fun resolveDropTarget(x: Int, y: Int, payload: Any?): DropTarget? {
+        val path = tree.getPathForLocation(x, y)
+        val node = path?.lastPathComponent as? DefaultMutableTreeNode
+        val rowBounds = path?.let { tree.getPathBounds(it) }
+        // Drop is in upper half of the row -> insert before; lower half -> insert after.
+        val dropAbove = rowBounds != null && y < (rowBounds.y + rowBounds.height / 2)
+
+        when (payload) {
+            is DraggedConnection -> {
+                if (node == null) {
+                    return DropTarget.MoveConnectionToRoot(payload.id)
+                }
+                return when (val obj = node.userObject) {
+                    is SshFolder -> DropTarget.MoveConnectionToFolder(payload.id, obj.id)
+                    is SshConnectionData -> {
+                        if (obj.id == payload.id) return null
+                        // Determine the connection-id to insert before (or null = append).
+                        val insertBeforeId = if (dropAbove) {
+                            obj.id
+                        } else {
+                            // Insert before the next sibling, if any
+                            siblingConnectionAfter(node)?.id
+                        }
+                        if (obj.folderId == null) {
+                            DropTarget.MoveConnectionToRoot(payload.id, insertBeforeId)
+                        } else {
+                            DropTarget.MoveConnectionToFolder(payload.id, obj.folderId!!, insertBeforeId)
+                        }
+                    }
+                    else -> DropTarget.MoveConnectionToRoot(payload.id)
+                }
+            }
+            is DraggedFolder -> {
+                if (node == null) {
+                    val lastIndex = connectionStorageService.getFolders().size
+                    return DropTarget.ReorderFolderTo(payload.id, lastIndex)
+                }
+                val obj = node.userObject
+                if (obj !is SshFolder) {
+                    // dropping a folder on a connection is rejected
+                    return null
+                }
+                if (obj.id == payload.id) return null
+                val targetIdx = connectionStorageService.getFolders().indexOfFirst { it.id == obj.id }
+                val newIndex = if (dropAbove) targetIdx else targetIdx + 1
+                return DropTarget.ReorderFolderTo(payload.id, newIndex)
+            }
+            else -> return null
+        }
+    }
+
+    /** Returns the connection node immediately after [node] under the same parent, or null. */
+    private fun siblingConnectionAfter(node: DefaultMutableTreeNode): SshConnectionData? {
+        val parent = node.parent as? DefaultMutableTreeNode ?: return null
+        val idx = parent.getIndex(node)
+        if (idx < 0 || idx + 1 >= parent.childCount) return null
+        val next = parent.getChildAt(idx + 1) as? DefaultMutableTreeNode ?: return null
+        return next.userObject as? SshConnectionData
+    }
+
+    private fun applyDrop(payload: Any?, target: DropTarget) {
+        when (target) {
+            is DropTarget.MoveConnectionToFolder -> {
+                connectionStorageService.moveConnection(target.connectionId, target.folderId)
+                target.insertBeforeConnectionId?.let { beforeId ->
+                    val beforeIdx = connectionStorageService.getConnections().indexOfFirst { it.id == beforeId }
+                    if (beforeIdx >= 0) connectionStorageService.reorderConnection(target.connectionId, beforeIdx)
+                }
+            }
+            is DropTarget.MoveConnectionToRoot -> {
+                connectionStorageService.moveConnection(target.connectionId, null)
+                target.insertBeforeConnectionId?.let { beforeId ->
+                    val beforeIdx = connectionStorageService.getConnections().indexOfFirst { it.id == beforeId }
+                    if (beforeIdx >= 0) connectionStorageService.reorderConnection(target.connectionId, beforeIdx)
+                }
+            }
+            is DropTarget.ReorderFolderTo ->
+                connectionStorageService.reorderFolder(target.folderId, target.newIndex)
+        }
     }
 
     override fun dispose() {
