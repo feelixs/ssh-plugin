@@ -203,6 +203,47 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         selectNodeById(folder.id)
     }
 
+    fun deleteFolder() {
+        val folder = selectedFolder() ?: return
+        val containedCount = connectionStorageService.getConnections().count { it.folderId == folder.id }
+        if (containedCount == 0) {
+            val result = Messages.showYesNoDialog(
+                project,
+                "Delete folder '${folder.name}'?",
+                "Delete Folder",
+                Messages.getWarningIcon()
+            )
+            if (result == Messages.YES) {
+                connectionStorageService.removeFolder(folder.id, deleteContainedConnections = false)
+                reloadTree()
+            }
+            return
+        }
+        val choice = Messages.showDialog(
+            project,
+            "Folder '${folder.name}' contains $containedCount connection(s). What would you like to do?",
+            "Delete Folder",
+            arrayOf(
+                "Delete folder only (move connections to root)",
+                "Delete folder and all connections",
+                "Cancel"
+            ),
+            2, // default = Cancel
+            Messages.getWarningIcon()
+        )
+        when (choice) {
+            0 -> {
+                connectionStorageService.removeFolder(folder.id, deleteContainedConnections = false)
+                reloadTree()
+            }
+            1 -> {
+                connectionStorageService.removeFolder(folder.id, deleteContainedConnections = true)
+                reloadTree()
+            }
+            else -> { /* cancel */ }
+        }
+    }
+
     fun editConnection() {
         val selectedConnection = selectedConnection() ?: return
         val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
