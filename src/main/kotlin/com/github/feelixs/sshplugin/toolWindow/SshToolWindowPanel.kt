@@ -187,6 +187,22 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         selectNodeById(folder.id)
     }
 
+    fun renameFolder() {
+        val folder = selectedFolder() ?: return
+        val newName = Messages.showInputDialog(
+            project,
+            "Folder name:",
+            "Rename Folder",
+            Messages.getQuestionIcon(),
+            folder.name,
+            null
+        )?.trim() ?: return
+        if (newName.isBlank() || newName == folder.name) return
+        connectionStorageService.renameFolder(folder.id, newName)
+        reloadTree()
+        selectNodeById(folder.id)
+    }
+
     fun editConnection() {
         val selectedConnection = selectedConnection() ?: return
         val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
@@ -261,5 +277,6 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         super.uiDataSnapshot(sink)
         sink.set(PluginDataKeys.SSH_TOOL_WINDOW_PANEL, this)
         selectedConnection()?.let { sink.set(PluginDataKeys.SELECTED_SSH_CONNECTION, it) }
+        selectedFolder()?.let { sink.set(PluginDataKeys.SELECTED_SSH_FOLDER, it) }
     }
 }
