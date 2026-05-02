@@ -422,19 +422,33 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
             is DropTarget.MoveConnectionToFolder -> {
                 connectionStorageService.moveConnection(target.connectionId, target.folderId)
                 target.insertBeforeConnectionId?.let { beforeId ->
-                    val beforeIdx = connectionStorageService.getConnections().indexOfFirst { it.id == beforeId }
-                    if (beforeIdx >= 0) connectionStorageService.reorderConnection(target.connectionId, beforeIdx)
+                    val connections = connectionStorageService.getConnections()
+                    val beforeIdx = connections.indexOfFirst { it.id == beforeId }
+                    if (beforeIdx >= 0) {
+                        val currentIdx = connections.indexOfFirst { it.id == target.connectionId }
+                        val adjustedIdx = if (currentIdx in 0 until beforeIdx) beforeIdx - 1 else beforeIdx
+                        connectionStorageService.reorderConnection(target.connectionId, adjustedIdx)
+                    }
                 }
             }
             is DropTarget.MoveConnectionToRoot -> {
                 connectionStorageService.moveConnection(target.connectionId, null)
                 target.insertBeforeConnectionId?.let { beforeId ->
-                    val beforeIdx = connectionStorageService.getConnections().indexOfFirst { it.id == beforeId }
-                    if (beforeIdx >= 0) connectionStorageService.reorderConnection(target.connectionId, beforeIdx)
+                    val connections = connectionStorageService.getConnections()
+                    val beforeIdx = connections.indexOfFirst { it.id == beforeId }
+                    if (beforeIdx >= 0) {
+                        val currentIdx = connections.indexOfFirst { it.id == target.connectionId }
+                        val adjustedIdx = if (currentIdx in 0 until beforeIdx) beforeIdx - 1 else beforeIdx
+                        connectionStorageService.reorderConnection(target.connectionId, adjustedIdx)
+                    }
                 }
             }
-            is DropTarget.ReorderFolderTo ->
-                connectionStorageService.reorderFolder(target.folderId, target.newIndex)
+            is DropTarget.ReorderFolderTo -> {
+                val folders = connectionStorageService.getFolders()
+                val currentIdx = folders.indexOfFirst { it.id == target.folderId }
+                val adjustedIdx = if (currentIdx in 0 until target.newIndex) target.newIndex - 1 else target.newIndex
+                connectionStorageService.reorderFolder(target.folderId, adjustedIdx)
+            }
         }
     }
 
