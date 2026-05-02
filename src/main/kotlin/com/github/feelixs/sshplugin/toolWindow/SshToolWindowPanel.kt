@@ -2,6 +2,7 @@ package com.github.feelixs.sshplugin.toolWindow
 
 import com.github.feelixs.sshplugin.actions.PluginDataKeys
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.github.feelixs.sshplugin.model.SshFolder
 import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.openapi.Disposable
@@ -9,244 +10,242 @@ import com.intellij.openapi.actionSystem.*
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
-import com.intellij.ui.components.JBList
 import com.intellij.ui.components.JBScrollPane
+import com.intellij.ui.treeStructure.Tree
 import com.intellij.util.ui.update.MergingUpdateQueue
 import com.intellij.util.ui.update.Update
 import java.util.Timer
 import java.util.TimerTask
-import javax.swing.DefaultListModel
-import javax.swing.ListSelectionModel
+import javax.swing.tree.DefaultMutableTreeNode
+import javax.swing.tree.DefaultTreeModel
+import javax.swing.tree.TreePath
+import javax.swing.tree.TreeSelectionModel
 
-// Represents the main panel content for the SSH Connections tool window.
-// Implements DataProvider to supply context to actions.
 class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(true, true), DataProvider, Disposable {
 
     private val connectionStorageService = SshConnectionStorageService.instance
-    private val listModel = DefaultListModel<SshConnectionData>()
-    private val connectionList = JBList(listModel)
+    private val rootNode = DefaultMutableTreeNode("ROOT")
+    private val treeModel = DefaultTreeModel(rootNode)
+    private val tree = Tree(treeModel)
     val executor = project.getService(SshConnectionExecutor::class.java)
 
-    // Timer to refresh connection list status
     private val refreshTimer = Timer("SSH-Connection-Status-Timer", true)
-    
-    // Update queue to avoid too many UI refreshes
     private val updateQueue = MergingUpdateQueue(
-        "SshConnectionListRefresh",
-        300, // merge updates within 300ms
-        true,
-        null,
-        this,
-        null,
-        false
+        "SshConnectionListRefresh", 300, true, null, this, null, false
     )
 
     init {
         setupUI()
-        loadConnections()
+        reloadTree()
         startStatusRefreshTimer()
     }
 
     private fun setupUI() {
-        // Toolbar setup
         val actionManager = ActionManager.getInstance()
-        // Retrieve the action group defined in plugin.xml
         val actionGroup = actionManager.getAction("SSHPlugin.ToolWindow.Toolbar") as? DefaultActionGroup
-            ?: DefaultActionGroup() // Fallback to empty group if not found
-
+            ?: DefaultActionGroup()
         val toolbar = actionManager.createActionToolbar(ActionPlaces.TOOLWINDOW_TOOLBAR_BAR, actionGroup, true)
-        toolbar.targetComponent = this // Set target component for context, important for DataContext
+        toolbar.targetComponent = this
         setToolbar(toolbar.component)
 
-        // List setup
-        connectionList.selectionMode = ListSelectionModel.SINGLE_SELECTION
-        connectionList.cellRenderer = SshConnectionListCellRenderer() // Custom renderer to display connection info
+        tree.isRootVisible = false
+        tree.showsRootHandles = true
+        tree.cellRenderer = SshConnectionTreeCellRenderer()
+        tree.selectionModel.selectionMode = TreeSelectionModel.SINGLE_TREE_SELECTION
 
-        val scrollPane = JBScrollPane(connectionList)
+        val scrollPane = JBScrollPane(tree)
         setContent(scrollPane)
+    }
 
-        // Add listener to update action states on selection change
-        connectionList.addListSelectionListener {
-            // Request an update of the actions' states in the toolbar
-            ActionManager.getInstance().getAction("SSHPlugin.ToolWindow.Toolbar")?.let { group ->
-                // This is a bit indirect, ideally update specific actions if possible
-                // For now, triggering an update on the group might refresh contained actions
-                // A more robust way might involve specific update calls if needed.
-            }
+    /**
+     * Rebuild the tree from storage, preserving the previously selected node id
+     * and expanded folder ids across the rebuild.
+     */
+    private fun reloadTree() {
+        val previouslySelectedId = selectedNodeId()
+        val expandedFolderIds = collectExpandedFolderIds()
+
+        rootNode.removeAllChildren()
+        val folders = connectionStorageService.getFolders()
+        val connections = connectionStorageService.getConnections()
+
+        // Folders first, then connections grouped under their folder
+        val folderNodesById = mutableMapOf<String, DefaultMutableTreeNode>()
+        for (folder in folders) {
+            val folderNode = DefaultMutableTreeNode(folder)
+            folderNodesById[folder.id] = folderNode
+            rootNode.add(folderNode)
+        }
+        for (connection in connections) {
+            val connNode = DefaultMutableTreeNode(connection)
+            val parent = connection.folderId
+                ?.let { folderNodesById[it] }
+                ?: rootNode  // null folderId OR orphan folderId -> root
+            parent.add(connNode)
+        }
+        treeModel.reload()
+
+        // Restore expansion
+        for (folderId in expandedFolderIds) {
+            val folderNode = folderNodesById[folderId] ?: continue
+            tree.expandPath(TreePath(folderNode.path))
+        }
+        // Restore selection
+        if (previouslySelectedId != null) {
+            selectNodeById(previouslySelectedId)
         }
     }
 
-    private fun loadConnections() {
-        listModel.clear()
-        val connections = connectionStorageService.getConnections()
-        connections.forEach { listModel.addElement(it) }
+    private fun selectedNodeId(): String? {
+        val selected = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return null
+        return when (val obj = selected.userObject) {
+            is SshConnectionData -> obj.id
+            is SshFolder -> obj.id
+            else -> null
+        }
     }
 
-    // --- Public methods for actions ---
+    private fun collectExpandedFolderIds(): Set<String> {
+        val ids = mutableSetOf<String>()
+        for (i in 0 until rootNode.childCount) {
+            val child = rootNode.getChildAt(i) as DefaultMutableTreeNode
+            val obj = child.userObject as? SshFolder ?: continue
+            if (tree.isExpanded(TreePath(child.path))) ids.add(obj.id)
+        }
+        return ids
+    }
+
+    private fun selectNodeById(id: String) {
+        val node = findNodeById(id) ?: return
+        val path = TreePath(node.path)
+        tree.selectionPath = path
+        tree.scrollPathToVisible(path)
+    }
+
+    private fun findNodeById(id: String): DefaultMutableTreeNode? {
+        for (i in 0 until rootNode.childCount) {
+            val child = rootNode.getChildAt(i) as DefaultMutableTreeNode
+            when (val obj = child.userObject) {
+                is SshFolder -> if (obj.id == id) return child
+                is SshConnectionData -> if (obj.id == id) return child
+            }
+            for (j in 0 until child.childCount) {
+                val grand = child.getChildAt(j) as DefaultMutableTreeNode
+                val gobj = grand.userObject as? SshConnectionData ?: continue
+                if (gobj.id == id) return grand
+            }
+        }
+        return null
+    }
+
+    /** The currently selected connection, or null. */
+    private fun selectedConnection(): SshConnectionData? {
+        val sel = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return null
+        return sel.userObject as? SshConnectionData
+    }
+
+    /** The currently selected folder, or null. */
+    private fun selectedFolder(): SshFolder? {
+        val sel = tree.lastSelectedPathComponent as? DefaultMutableTreeNode ?: return null
+        return sel.userObject as? SshFolder
+    }
+
+    /**
+     * Determines the target folder id for a newly added connection, based on
+     * the current selection: selected folder -> that folder; selected connection
+     * -> its parent folder; otherwise null (root).
+     */
+    private fun targetFolderIdForNewConnection(): String? {
+        selectedFolder()?.let { return it.id }
+        selectedConnection()?.let { return it.folderId }
+        return null
+    }
+
+    // --- Public API for actions ---
 
     fun addConnection() {
         val dialog = SshConnectionDialog(project)
         if (dialog.showAndGet()) {
-            // User clicked OK - get the connection data and save it
             val newConnection = dialog.createConnectionData()
+            newConnection.folderId = targetFolderIdForNewConnection()
             connectionStorageService.addConnection(newConnection)
-            println("Added new connection: ${newConnection.alias}")
-            loadConnections() // Reload the list to show the new connection
-        } else {
-            println("Add connection cancelled")
+            reloadTree()
         }
     }
 
     fun editConnection() {
-        val selectedConnection = connectionList.selectedValue
-        if (selectedConnection != null) {
-            // Get a copy with decrypted passwords for editing
-            val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
-            if (connectionWithPasswords != null) {
-                val dialog = SshConnectionDialog(project, connectionWithPasswords)
-                if (dialog.showAndGet()) {
-                    // User clicked OK - get the updated connection data and save it
-                    val updatedConnection = dialog.createConnectionData()
-                    connectionStorageService.updateConnection(updatedConnection)
-                    println("Updated connection: ${updatedConnection.alias}")
-                    loadConnections() // Reload the list to show the updated connection
-                } else {
-                    println("Edit connection cancelled for: ${selectedConnection.alias}")
-                }
-            }
+        val selectedConnection = selectedConnection() ?: return
+        val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
+            ?: return
+        val dialog = SshConnectionDialog(project, connectionWithPasswords)
+        if (dialog.showAndGet()) {
+            val updated = dialog.createConnectionData()
+            // Preserve folderId across edit (dialog doesn't expose it)
+            updated.folderId = selectedConnection.folderId
+            connectionStorageService.updateConnection(updated)
+            reloadTree()
         }
     }
 
     fun deleteConnection() {
-        val selectedConnection = connectionList.selectedValue
-        if (selectedConnection != null) {
-            // Show confirmation dialog before deleting
-            val confirmTitle = "Confirm Deletion"
-            val confirmMessage = "Are you sure you want to delete the connection '${selectedConnection.alias}'?"
-            
-            val result = Messages.showYesNoDialog(
-                project,
-                confirmMessage,
-                confirmTitle,
-                Messages.getQuestionIcon()
-            )
-            
-            if (result == Messages.YES) {
-                // User confirmed, proceed with deletion
-                connectionStorageService.removeConnection(selectedConnection.id)
-                println("Connection deleted: ${selectedConnection.alias}")
-                loadConnections() // Reload list
-            } else {
-                // User cancelled deletion
-                println("Deletion cancelled for: ${selectedConnection.alias}")
-            }
+        val selectedConnection = selectedConnection() ?: return
+        val result = Messages.showYesNoDialog(
+            project,
+            "Are you sure you want to delete the connection '${selectedConnection.alias}'?",
+            "Confirm Deletion",
+            Messages.getQuestionIcon()
+        )
+        if (result == Messages.YES) {
+            connectionStorageService.removeConnection(selectedConnection.id)
+            reloadTree()
         }
     }
 
     fun connect() {
-        val selectedConnection = connectionList.selectedValue
-        if (selectedConnection != null) {
-            // Get the service instance of SshConnectionExecutor
-            val executor = project.getService(com.github.feelixs.sshplugin.services.SshConnectionExecutor::class.java)
-            val success = executor.executeConnection(selectedConnection.id)
-            
-            if (success) {
-                println("SSH connection initiated for: ${selectedConnection.alias}")
-            } else {
-                println("Failed to initiate SSH connection for: ${selectedConnection.alias}")
-            }
-        }
-    }
-    
-    /**
-     * Duplicates the currently selected connection with a "Copy of" prefix.
-     */
-    fun duplicateConnection() {
-        val selectedConnection = connectionList.selectedValue
-        if (selectedConnection != null) {
-            // Get a copy with decrypted passwords
-            val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)
-            if (connectionWithPasswords != null) {
-                // Create a clone with a new ID and modified alias
-                val duplicatedConnection = connectionWithPasswords.copy(
-                    id = java.util.UUID.randomUUID().toString(),
-                    alias = "Copy of ${connectionWithPasswords.alias}",
-                    // Ensure all password fields are correctly copied
-                    encodedPassword = connectionWithPasswords.encodedPassword,
-                    encodedSudoPassword = connectionWithPasswords.encodedSudoPassword,
-                    encodedKeyPassword = connectionWithPasswords.encodedKeyPassword
-                )
-                
-                // Add the duplicated connection
-                connectionStorageService.addConnection(duplicatedConnection)
-                println("Duplicated connection: ${selectedConnection.alias} -> ${duplicatedConnection.alias}")
-                
-                // Reload the list to show the new connection
-                loadConnections()
-                
-                // Select the new connection in the list
-                for (i in 0 until listModel.size()) {
-                    val connection = listModel.getElementAt(i)
-                    if (connection.id == duplicatedConnection.id) {
-                        connectionList.selectedIndex = i
-                        break
-                    }
-                }
-            }
-        }
+        val selectedConnection = selectedConnection() ?: return
+        executor.executeConnection(selectedConnection.id)
     }
 
-    /**
-     * Starts a timer to refresh the connection list status every few seconds
-     * This ensures the asterisk indicators for active connections stay current
-     */
+    fun duplicateConnection() {
+        val selectedConnection = selectedConnection() ?: return
+        val withPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id) ?: return
+        val duplicated = withPasswords.copy(
+            id = java.util.UUID.randomUUID().toString(),
+            alias = "Copy of ${withPasswords.alias}",
+            encodedPassword = withPasswords.encodedPassword,
+            encodedSudoPassword = withPasswords.encodedSudoPassword,
+            encodedKeyPassword = withPasswords.encodedKeyPassword,
+            folderId = withPasswords.folderId
+        )
+        connectionStorageService.addConnection(duplicated)
+        reloadTree()
+        selectNodeById(duplicated.id)
+    }
+
     private fun startStatusRefreshTimer() {
-        // Schedule a timer task to refresh the connection list every 2 seconds
         refreshTimer.schedule(object : TimerTask() {
             override fun run() {
-                // Use update queue to avoid flooding UI thread
-                // Queue update on UI thread
                 updateQueue.queue(Update.create("refresh") {
                     try {
-                        // Only repaint the list if component is still valid
-                        if (connectionList.isShowing && connectionList.isValid) {
-                            connectionList.repaint()
+                        if (tree.isShowing && tree.isValid) {
+                            tree.repaint()
                         }
-                        /*for (connection in connectionStorageService.getConnections()) {
-                            val thiscon = executor.getTerminal(connection.id)
-                            println(thiscon.toString())
-                            println(thiscon?.hasFocus())
-                            println(executor.getTerminalCount(connection.id).toString())
-                        }*/
                     } catch (e: Exception) {
-                        // Ignore exceptions that might occur during shutdown
                         refreshTimer.cancel()
                     }
                 })
             }
-        }, 2000, 2000) // Initial delay 2 sec, then every 2 sec
+        }, 2000, 2000)
     }
-    
-    /**
-     * Clean up resources when panel is disposed
-     */
+
     override fun dispose() {
-        // Cancel timer to prevent memory leaks
         refreshTimer.cancel()
         updateQueue.cancelAllUpdates()
     }
 
-    // --- DataProvider Implementation ---
     override fun uiDataSnapshot(sink: DataSink) {
-        // Call the superclass implementation first
         super.uiDataSnapshot(sink)
-
-        // Provide the panel instance itself
         sink.set(PluginDataKeys.SSH_TOOL_WINDOW_PANEL, this)
-
-        // Provide the currently selected connection (if it's not null)
-        connectionList.selectedValue?.let { connection ->
-            sink.set(PluginDataKeys.SELECTED_SSH_CONNECTION, connection)
-        }
+        selectedConnection()?.let { sink.set(PluginDataKeys.SELECTED_SSH_CONNECTION, it) }
     }
 }
