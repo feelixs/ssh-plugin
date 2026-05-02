@@ -173,6 +173,20 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         }
     }
 
+    fun newFolder() {
+        val name = Messages.showInputDialog(
+            project,
+            "Folder name:",
+            "New Folder",
+            Messages.getQuestionIcon()
+        )?.trim() ?: return
+        if (name.isBlank()) return
+        val folder = SshFolder(name = name)
+        connectionStorageService.addFolder(folder)
+        reloadTree()
+        selectNodeById(folder.id)
+    }
+
     fun editConnection() {
         val selectedConnection = selectedConnection() ?: return
         val connectionWithPasswords = connectionStorageService.getConnectionWithPlainPasswords(selectedConnection.id)

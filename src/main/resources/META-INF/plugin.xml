@@ -36,6 +36,10 @@
                     class="com.github.feelixs.sshplugin.actions.AddConnectionAction"
                     text="Add Connection"
                     description="Add a new SSH connection configuration"/>
+            <action id="SSHPlugin.NewFolder"
+                    class="com.github.feelixs.sshplugin.actions.NewFolderAction"
+                    text="New Folder"
+                    description="Create a new folder for organizing SSH connections"/>
             <action id="SSHPlugin.EditConnection"
                     class="com.github.feelixs.sshplugin.actions.EditConnectionAction"
                     text="Edit Connection"
