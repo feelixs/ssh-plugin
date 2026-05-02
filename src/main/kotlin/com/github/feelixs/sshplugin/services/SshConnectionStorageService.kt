@@ -2,6 +2,7 @@ package com.github.feelixs.sshplugin.services
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.github.feelixs.sshplugin.model.SshFolder
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.credentialStore.generateServiceName
@@ -24,6 +25,9 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     class State {
         @XCollection(style = XCollection.Style.v2)
         var connections: MutableList<SshConnectionData> = mutableListOf()
+
+        @XCollection(style = XCollection.Style.v2)
+        var folders: MutableList<SshFolder> = mutableListOf()
     }
 
     private var internalState = State()
