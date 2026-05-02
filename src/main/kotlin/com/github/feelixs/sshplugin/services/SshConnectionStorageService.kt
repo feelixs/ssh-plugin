@@ -239,4 +239,79 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         
         return sshCommand.toString()
     }
+
+    // --- Folder management ---
+
+    fun getFolders(): List<SshFolder> {
+        return internalState.folders.toList()
+    }
+
+    fun addFolder(folder: SshFolder) {
+        internalState.folders.add(folder)
+    }
+
+    fun renameFolder(id: String, newName: String) {
+        val folder = internalState.folders.find { it.id == id } ?: return
+        folder.name = newName
+    }
+
+    /**
+     * Removes a folder. If [deleteContainedConnections] is true, contained
+     * connections are deleted via [removeConnection] (which also purges their
+     * passwords from PasswordSafe). Otherwise contained connections have their
+     * folderId reset to null (moved to root). Missing id is a no-op.
+     */
+    fun removeFolder(id: String, deleteContainedConnections: Boolean) {
+        val folder = internalState.folders.find { it.id == id } ?: return
+        val containedIds = internalState.connections
+            .filter { it.folderId == id }
+            .map { it.id }
+        if (deleteContainedConnections) {
+            for (connId in containedIds) {
+                removeConnection(connId)
+            }
+        } else {
+            for (conn in internalState.connections) {
+                if (conn.folderId == id) conn.folderId = null
+            }
+        }
+        internalState.folders.remove(folder)
+    }
+
+    /**
+     * Moves a connection to a new folder. Pass null for [targetFolderId] to move
+     * to root. If [targetFolderId] is non-null but no folder with that id exists,
+     * this is a no-op (folderId is left unchanged).
+     */
+    fun moveConnection(connectionId: String, targetFolderId: String?) {
+        val connection = internalState.connections.find { it.id == connectionId } ?: return
+        if (targetFolderId != null && internalState.folders.none { it.id == targetFolderId }) {
+            return
+        }
+        connection.folderId = targetFolderId
+    }
+
+    /**
+     * Reorders a connection within the underlying connections list. [newIndexInList]
+     * is clamped to [0, connections.lastIndex]. Missing id is a no-op.
+     */
+    fun reorderConnection(connectionId: String, newIndexInList: Int) {
+        val currentIndex = internalState.connections.indexOfFirst { it.id == connectionId }
+        if (currentIndex == -1) return
+        val item = internalState.connections.removeAt(currentIndex)
+        val safeIndex = newIndexInList.coerceIn(0, internalState.connections.size)
+        internalState.connections.add(safeIndex, item)
+    }
+
+    /**
+     * Reorders a folder within the folders list. [newIndexInList] is clamped.
+     * Missing id is a no-op.
+     */
+    fun reorderFolder(folderId: String, newIndexInList: Int) {
+        val currentIndex = internalState.folders.indexOfFirst { it.id == folderId }
+        if (currentIndex == -1) return
+        val item = internalState.folders.removeAt(currentIndex)
+        val safeIndex = newIndexInList.coerceIn(0, internalState.folders.size)
+        internalState.folders.add(safeIndex, item)
+    }
 }
