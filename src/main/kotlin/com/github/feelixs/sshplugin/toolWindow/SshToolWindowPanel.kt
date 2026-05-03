@@ -71,20 +71,34 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         val folders = connectionStorageService.getFolders()
         val connections = connectionStorageService.getConnections()
 
-        // Folders first, then connections grouped under their folder
+        // Build root entries: folders + root connections, all sorted by order.
+        // Each entry pairs (order, lazy node builder) so we can sort and then attach in one pass.
+        val rootEntries = mutableListOf<Pair<Int, DefaultMutableTreeNode>>()
         val folderNodesById = mutableMapOf<String, DefaultMutableTreeNode>()
         for (folder in folders) {
-            val folderNode = DefaultMutableTreeNode(folder)
-            folderNodesById[folder.id] = folderNode
-            rootNode.add(folderNode)
+            val node = DefaultMutableTreeNode(folder)
+            folderNodesById[folder.id] = node
+            rootEntries += folder.order to node
         }
-        for (connection in connections) {
-            val connNode = DefaultMutableTreeNode(connection)
-            val parent = connection.folderId
-                ?.let { folderNodesById[it] }
-                ?: rootNode  // null folderId OR orphan folderId -> root
-            parent.add(connNode)
+        for (conn in connections.filter { it.folderId == null }) {
+            rootEntries += conn.order to DefaultMutableTreeNode(conn)
         }
+        // Stable sort: ties (e.g., first-load before normalize) preserve insertion order.
+        rootEntries.sortedBy { it.first }.forEach { (_, node) -> rootNode.add(node) }
+
+        // Connections inside folders.
+        for ((folderId, folderNode) in folderNodesById) {
+            connections
+                .filter { it.folderId == folderId }
+                .sortedBy { it.order }
+                .forEach { folderNode.add(DefaultMutableTreeNode(it)) }
+        }
+        // Orphan connections: folderId is non-null but folder does not exist.
+        connections
+            .filter { it.folderId != null && it.folderId !in folderNodesById.keys }
+            .sortedBy { it.order }
+            .forEach { rootNode.add(DefaultMutableTreeNode(it)) }
+
         treeModel.reload()
 
         // Restore expansion
