@@ -1,6 +1,7 @@
 import org.jetbrains.changelog.Changelog
 import org.jetbrains.changelog.markdownToHTML
 import org.jetbrains.intellij.platform.gradle.TestFrameworkType
+import org.jetbrains.intellij.platform.gradle.tasks.VerifyPluginTask.FailureLevel
 
 plugins {
     id("java") // Java support
@@ -109,6 +110,20 @@ intellijPlatform {
         ides {
             recommended()
         }
+        // INTERNAL_API_USAGES omitted: Kotlin emits bridge overrides for
+        // ToolWindowFactory.getAnchor/getIcon/manage when implementing the
+        // interface. Those methods are @ApiStatus.Internal in 251/252 (de-internalized
+        // in 253+) so the verifier flags them even though source never references them.
+        // Verdict on all targets is "Compatible"; the bridges are runtime-safe.
+        failureLevel = listOf(
+            FailureLevel.COMPATIBILITY_PROBLEMS,
+            FailureLevel.INVALID_PLUGIN,
+            FailureLevel.NON_EXTENDABLE_API_USAGES,
+            FailureLevel.OVERRIDE_ONLY_API_USAGES,
+            FailureLevel.PLUGIN_STRUCTURE_WARNINGS,
+            FailureLevel.MISSING_DEPENDENCIES,
+            FailureLevel.NOT_DYNAMIC,
+        )
     }
 }
 

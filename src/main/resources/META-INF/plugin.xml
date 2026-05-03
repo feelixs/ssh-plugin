@@ -19,7 +19,7 @@
         <!-- Define the tool window -->
         <toolWindow
                 id="SSH Connections"
-                anchor="left"
+                anchor="right"
                 icon="icons/cloud.svg"
                 factoryClass="com.github.feelixs.sshplugin.toolWindow.SshToolWindowFactory"/>
                 
@@ -36,6 +36,10 @@
                     class="com.github.feelixs.sshplugin.actions.AddConnectionAction"
                     text="Add Connection"
                     description="Add a new SSH connection configuration"/>
+            <action id="SSHPlugin.NewFolder"
+                    class="com.github.feelixs.sshplugin.actions.NewFolderAction"
+                    text="New Folder"
+                    description="Create a new folder for organizing SSH connections"/>
             <action id="SSHPlugin.EditConnection"
                     class="com.github.feelixs.sshplugin.actions.EditConnectionAction"
                     text="Edit Connection"
@@ -63,6 +67,27 @@
                     text="Copy Sudo Password"
                     description="Copy the sudo password of the selected connection to clipboard"/>
             <add-to-group group-id="ToolsMenu" anchor="last"/> <!-- Example: Add group to Tools menu -->
+        </group>
+        <group id="SSHPlugin.ToolWindow.Popup" popup="true">
+            <reference ref="SSHPlugin.Connect"/>
+            <reference ref="SSHPlugin.Disconnect"/>
+            <separator/>
+            <reference ref="SSHPlugin.AddConnection"/>
+            <reference ref="SSHPlugin.EditConnection"/>
+            <reference ref="SSHPlugin.DuplicateConnection"/>
+            <reference ref="SSHPlugin.DeleteConnection"/>
+            <separator/>
+            <reference ref="SSHPlugin.NewFolder"/>
+            <action id="SSHPlugin.RenameFolder"
+                    class="com.github.feelixs.sshplugin.actions.RenameFolderAction"
+                    text="Rename Folder…"
+                    description="Rename the selected folder"/>
+            <action id="SSHPlugin.DeleteFolder"
+                    class="com.github.feelixs.sshplugin.actions.DeleteFolderAction"
+                    text="Delete Folder…"
+                    description="Delete the selected folder"/>
+            <separator/>
+            <reference ref="SSHPlugin.CopySudoPassword"/>
         </group>
     </actions>
 

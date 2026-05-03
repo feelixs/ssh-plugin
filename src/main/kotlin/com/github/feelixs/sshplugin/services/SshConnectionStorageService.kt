@@ -2,6 +2,7 @@ package com.github.feelixs.sshplugin.services
 
 import com.github.feelixs.sshplugin.model.OsType
 import com.github.feelixs.sshplugin.model.SshConnectionData
+import com.github.feelixs.sshplugin.model.SshFolder
 import com.intellij.credentialStore.CredentialAttributes
 import com.intellij.credentialStore.Credentials
 import com.intellij.credentialStore.generateServiceName
@@ -24,6 +25,9 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     class State {
         @XCollection(style = XCollection.Style.v2)
         var connections: MutableList<SshConnectionData> = mutableListOf()
+
+        @XCollection(style = XCollection.Style.v2)
+        var folders: MutableList<SshFolder> = mutableListOf()
     }
 
     private var internalState = State()
@@ -59,6 +63,52 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         // Decrypt passwords after loading state
         for (connection in internalState.connections) {
             decryptConnectionPasswords(connection)
+        }
+        normalizeOrder()
+    }
+
+    /**
+     * For each scope (root, and each folder), reassign sequential order values
+     * 0, 1, 2, ... based on current order ascending. Runs on every load.
+     *
+     * Two purposes:
+     *  - On first load after the v0.3.0 -> v0.4.0 upgrade, all items have order=0,
+     *    so the sort is stable by list position and the assignment preserves the
+     *    user's existing arrangement.
+     *  - On every subsequent load, compacts away the gaps that accumulate as
+     *    placeAt repeatedly increments order on neighbors. This keeps order values
+     *    bounded and the persisted XML small.
+     *
+     * Folders sort tied with connections (both at root) by order; ties (same value)
+     * resolve via insertion order from each underlying list, with folders inserted
+     * before connections at the same value to match the original render order.
+     */
+    private fun normalizeOrder() {
+        // --- Root scope: folders + root connections share an ordering namespace. ---
+        // Tie-breaker scheme: folders get tiebreakers 0..F-1, root connections get
+        // tiebreakers F..F+R-1. So when items share the same order value, all folders
+        // sort before all connections (matching the v0.3.0 render order, important for
+        // first-load-after-upgrade where every item has order=0).
+        val rootFolders = internalState.folders.toList()
+        val rootConnections = internalState.connections.filter { it.folderId == null }
+        val folderCount = rootFolders.size
+        data class RootItem(val folder: SshFolder?, val conn: SshConnectionData?)
+        val rootItems = mutableListOf<Triple<Int, Int, RootItem>>()
+        rootFolders.forEachIndexed { i, f -> rootItems += Triple(f.order, i, RootItem(f, null)) }
+        rootConnections.forEachIndexed { i, c -> rootItems += Triple(c.order, folderCount + i, RootItem(null, c)) }
+        rootItems.sortWith(compareBy({ it.first }, { it.second }))
+        rootItems.forEachIndexed { idx, (_, _, item) ->
+            item.folder?.order = idx
+            item.conn?.order = idx
+        }
+        // --- Each folder's connection scope. ---
+        for (folder in internalState.folders) {
+            val children = internalState.connections.filter { it.folderId == folder.id }
+            if (children.isEmpty()) continue
+            children
+                .mapIndexed { i, c -> Triple(c.order, i, c) }
+                .sortedWith(compareBy({ it.first }, { it.second }))
+                .forEachIndexed { idx, (_, _, conn) -> conn.order = idx }
         }
     }
 
@@ -159,7 +209,18 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     fun addConnection(connection: SshConnectionData) {
-        // Ensure we encrypt passwords when adding a connection
+        // Auto-assign order = (max in target scope) + 1; 0 if scope empty.
+        // Scope is determined by the connection's folderId, which the caller already set.
+        val scopeMax = internalState.connections
+            .filter { it.folderId == connection.folderId }
+            .maxOfOrNull { it.order } ?: -1
+        val rootScopeMax = if (connection.folderId == null) {
+            // Root scope also includes folders
+            maxOf(scopeMax, internalState.folders.maxOfOrNull { it.order } ?: -1)
+        } else {
+            scopeMax
+        }
+        connection.order = rootScopeMax + 1
         encryptConnectionPasswords(connection)
         internalState.connections.add(connection)
     }
@@ -234,5 +295,106 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         // or through other secure methods like an agent or passphrase prompt
         
         return sshCommand.toString()
+    }
+
+    // --- Folder management ---
+
+    fun getFolders(): List<SshFolder> {
+        return internalState.folders.toList()
+    }
+
+    fun addFolder(folder: SshFolder) {
+        // Folders are always at root; root scope = folders + root connections.
+        val foldersMax = internalState.folders.maxOfOrNull { it.order } ?: -1
+        val rootConnectionsMax = internalState.connections
+            .filter { it.folderId == null }
+            .maxOfOrNull { it.order } ?: -1
+        folder.order = maxOf(foldersMax, rootConnectionsMax) + 1
+        internalState.folders.add(folder)
+    }
+
+    fun renameFolder(id: String, newName: String) {
+        val folder = internalState.folders.find { it.id == id } ?: return
+        folder.name = newName
+    }
+
+    /**
+     * Removes a folder. If [deleteContainedConnections] is true, contained
+     * connections are deleted via [removeConnection] (which also purges their
+     * passwords from PasswordSafe). Otherwise contained connections have their
+     * folderId reset to null (moved to root). Missing id is a no-op.
+     */
+    fun removeFolder(id: String, deleteContainedConnections: Boolean) {
+        val folder = internalState.folders.find { it.id == id } ?: return
+        val containedIds = internalState.connections
+            .filter { it.folderId == id }
+            .map { it.id }
+        if (deleteContainedConnections) {
+            for (connId in containedIds) {
+                removeConnection(connId)
+            }
+        } else {
+            for (conn in internalState.connections) {
+                if (conn.folderId == id) conn.folderId = null
+            }
+        }
+        internalState.folders.remove(folder)
+    }
+
+    /**
+     * Places an item (folder or connection) at [targetOrder] within [parentFolderId].
+     * Increments order on every other item in the same scope where order >= targetOrder.
+     *
+     * For folders, [parentFolderId] is ignored — folders are always placed at root.
+     * For a connection, if [parentFolderId] is non-null but no folder with that id
+     * exists, this is a no-op.
+     *
+     * Missing item id is a no-op. [targetOrder] is clamped to non-negative.
+     */
+    fun placeAt(itemId: String, parentFolderId: String?, targetOrder: Int) {
+        val safeOrder = maxOf(targetOrder, 0)
+        val folder = internalState.folders.find { it.id == itemId }
+        if (folder != null) {
+            // Folder placement: always at root scope.
+            // Increment order on other folders and root connections where order >= safeOrder.
+            for (otherFolder in internalState.folders) {
+                if (otherFolder.id != itemId && otherFolder.order >= safeOrder) {
+                    otherFolder.order += 1
+                }
+            }
+            for (conn in internalState.connections) {
+                if (conn.folderId == null && conn.order >= safeOrder) {
+                    conn.order += 1
+                }
+            }
+            folder.order = safeOrder
+            return
+        }
+        val connection = internalState.connections.find { it.id == itemId } ?: return
+        // Validate target folder if specified.
+        if (parentFolderId != null && internalState.folders.none { it.id == parentFolderId }) {
+            return
+        }
+        // Connection placement scope:
+        //   - parentFolderId == null: root scope (folders + root connections).
+        //   - parentFolderId != null: connections in that folder.
+        if (parentFolderId == null) {
+            for (otherFolder in internalState.folders) {
+                if (otherFolder.order >= safeOrder) otherFolder.order += 1
+            }
+            for (otherConn in internalState.connections) {
+                if (otherConn.id != itemId && otherConn.folderId == null && otherConn.order >= safeOrder) {
+                    otherConn.order += 1
+                }
+            }
+        } else {
+            for (otherConn in internalState.connections) {
+                if (otherConn.id != itemId && otherConn.folderId == parentFolderId && otherConn.order >= safeOrder) {
+                    otherConn.order += 1
+                }
+            }
+        }
+        connection.folderId = parentFolderId
+        connection.order = safeOrder
     }
 }

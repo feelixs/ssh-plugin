@@ -4,6 +4,20 @@
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-05-02
+
+### Added
+
+- Folders for organizing SSH connections in the tool window
+- Drag and drop to move connections between folders, reorder connections within a folder, and reorder folders
+- New Folder toolbar button
+- Right-click context menu with Rename Folder and Delete Folder actions
+- Three-button confirm when deleting a non-empty folder (move connections to root, delete everything, or cancel)
+
+### Changed
+
+- Tool window now uses a tree view instead of a flat list
+
 ## [0.2.1] - 2026-04-27
 
 ### Fixed
@@ -47,7 +61,8 @@
 
 - Notification when no password exists for the connection.
 
-[Unreleased]: https://github.com/feelixs/ssh-plugin/compare/0.2.1...HEAD
+[Unreleased]: https://github.com/feelixs/ssh-plugin/compare/0.3.0...HEAD
+[0.3.0]: https://github.com/feelixs/ssh-plugin/compare/0.2.1...0.3.0
 [0.2.1]: https://github.com/feelixs/ssh-plugin/compare/0.2.0...0.2.1
 [0.2.0]: https://github.com/feelixs/ssh-plugin/compare/0.1.9...0.2.0
 [0.1.9]: https://github.com/feelixs/ssh-plugin/compare/0.1.8...0.1.9

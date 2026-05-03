@@ -6,4 +6,5 @@
 .qodana
 build
 .aider*
+docs/
 CLAUDE.md
