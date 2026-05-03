@@ -330,7 +330,12 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
 
     private fun installPopupMenu() {
         val popupGroup = ActionManager.getInstance()
-            .getAction("SSHPlugin.ToolWindow.Popup") as? DefaultActionGroup ?: return
+            .getAction("SSHPlugin.ToolWindow.Popup") as? DefaultActionGroup
+        if (popupGroup == null) {
+            com.intellij.openapi.diagnostic.thisLogger()
+                .warn("SSHPlugin.ToolWindow.Popup action group not found; right-click menu disabled")
+            return
+        }
         com.intellij.ui.PopupHandler.installPopupMenu(
             tree, popupGroup, "SSHPluginToolWindowPopup"
         )
