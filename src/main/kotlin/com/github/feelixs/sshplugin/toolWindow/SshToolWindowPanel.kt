@@ -7,6 +7,7 @@ import com.github.feelixs.sshplugin.services.SshConnectionExecutor
 import com.github.feelixs.sshplugin.services.SshConnectionStorageService
 import com.intellij.openapi.Disposable
 import com.intellij.openapi.actionSystem.*
+import com.intellij.openapi.diagnostic.thisLogger
 import com.intellij.openapi.project.Project
 import com.intellij.openapi.ui.Messages
 import com.intellij.openapi.ui.SimpleToolWindowPanel
@@ -332,8 +333,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         val popupGroup = ActionManager.getInstance()
             .getAction("SSHPlugin.ToolWindow.Popup") as? DefaultActionGroup
         if (popupGroup == null) {
-            com.intellij.openapi.diagnostic.thisLogger()
-                .warn("SSHPlugin.ToolWindow.Popup action group not found; right-click menu disabled")
+            thisLogger().warn("SSHPlugin.ToolWindow.Popup action group not found; right-click menu disabled")
             return
         }
         com.intellij.ui.PopupHandler.installPopupMenu(
