@@ -68,35 +68,47 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     /**
-     * For each scope (root, and each folder), if every item has order == 0, assign
-     * sequential order values 0, 1, 2, ... in current list-position order. This
-     * preserves a user's existing arrangement on first load after upgrade. After
-     * any user reorder the scope has at least one non-zero order, so this is a no-op.
+     * For each scope (root, and each folder), reassign sequential order values
+     * 0, 1, 2, ... based on current order ascending. Runs on every load.
+     *
+     * Two purposes:
+     *  - On first load after the v0.3.0 -> v0.4.0 upgrade, all items have order=0,
+     *    so the sort is stable by list position and the assignment preserves the
+     *    user's existing arrangement.
+     *  - On every subsequent load, compacts away the gaps that accumulate as
+     *    placeAt repeatedly increments order on neighbors. This keeps order values
+     *    bounded and the persisted XML small.
+     *
+     * Folders sort tied with connections (both at root) by order; ties (same value)
+     * resolve via insertion order from each underlying list, with folders inserted
+     * before connections at the same value to match the original render order.
      */
     private fun normalizeOrder() {
-        // --- Root scope: folders (in folders-list order) followed by root connections (in connections-list order). ---
-        val rootFolders = internalState.folders
+        // --- Root scope: folders + root connections share an ordering namespace. ---
+        // Tie-breaker scheme: folders get tiebreakers 0..F-1, root connections get
+        // tiebreakers F..F+R-1. So when items share the same order value, all folders
+        // sort before all connections (matching the v0.3.0 render order, important for
+        // first-load-after-upgrade where every item has order=0).
+        val rootFolders = internalState.folders.toList()
         val rootConnections = internalState.connections.filter { it.folderId == null }
-        val rootAllZero = rootFolders.all { it.order == 0 } && rootConnections.all { it.order == 0 }
-        if (rootAllZero && (rootFolders.isNotEmpty() || rootConnections.isNotEmpty())) {
-            var i = 0
-            for (folder in rootFolders) {
-                folder.order = i++
-            }
-            for (conn in rootConnections) {
-                conn.order = i++
-            }
+        val folderCount = rootFolders.size
+        data class RootItem(val folder: SshFolder?, val conn: SshConnectionData?)
+        val rootItems = mutableListOf<Triple<Int, Int, RootItem>>()
+        rootFolders.forEachIndexed { i, f -> rootItems += Triple(f.order, i, RootItem(f, null)) }
+        rootConnections.forEachIndexed { i, c -> rootItems += Triple(c.order, folderCount + i, RootItem(null, c)) }
+        rootItems.sortWith(compareBy({ it.first }, { it.second }))
+        rootItems.forEachIndexed { idx, (_, _, item) ->
+            item.folder?.order = idx
+            item.conn?.order = idx
         }
         // --- Each folder's connection scope. ---
         for (folder in internalState.folders) {
             val children = internalState.connections.filter { it.folderId == folder.id }
             if (children.isEmpty()) continue
-            if (children.all { it.order == 0 }) {
-                var j = 0
-                for (conn in children) {
-                    conn.order = j++
-                }
-            }
+            children
+                .mapIndexed { i, c -> Triple(c.order, i, c) }
+                .sortedWith(compareBy({ it.first }, { it.second }))
+                .forEachIndexed { idx, (_, _, conn) -> conn.order = idx }
         }
     }
 
