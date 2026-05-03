@@ -351,7 +351,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
             }
             .setDropHandler { event ->
                 val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject) ?: return@setDropHandler
-                applyDrop(event.attachedObject, target)
+                applyDrop(target)
                 reloadTree()
             }
             .install()
@@ -361,109 +361,125 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     private data class DraggedFolder(val id: String)
 
     /**
-     * What a drop should do, computed from the drop point and dragged payload.
+     * Result of a drop computation: place [itemId] at [targetOrder] within
+     * [parentFolderId] (null = root). null return from resolveDropTarget = reject.
      */
-    private sealed class DropTarget {
-        /** Move connection into a folder; if [insertBeforeConnectionId] is non-null, insert just before it; else append to end of folder's contents. */
-        data class MoveConnectionToFolder(val connectionId: String, val folderId: String, val insertBeforeConnectionId: String? = null) : DropTarget()
-        /** Move connection to root; if [insertBeforeConnectionId] is non-null, insert just before it; else append. */
-        data class MoveConnectionToRoot(val connectionId: String, val insertBeforeConnectionId: String? = null) : DropTarget()
-        data class ReorderFolderTo(val folderId: String, val newIndex: Int) : DropTarget()
-    }
+    private data class PlaceItem(val itemId: String, val parentFolderId: String?, val targetOrder: Int)
 
-    private fun resolveDropTarget(x: Int, y: Int, payload: Any?): DropTarget? {
+    private fun resolveDropTarget(x: Int, y: Int, payload: Any?): PlaceItem? {
         val path = tree.getPathForLocation(x, y)
         val node = path?.lastPathComponent as? DefaultMutableTreeNode
         val rowBounds = path?.let { tree.getPathBounds(it) }
-        // Drop is in upper half of the row -> insert before; lower half -> insert after.
-        val dropAbove = rowBounds != null && y < (rowBounds.y + rowBounds.height / 2)
 
-        when (payload) {
-            is DraggedConnection -> {
-                if (node == null) {
-                    return DropTarget.MoveConnectionToRoot(payload.id)
-                }
-                return when (val obj = node.userObject) {
-                    is SshFolder -> DropTarget.MoveConnectionToFolder(payload.id, obj.id)
-                    is SshConnectionData -> {
-                        if (obj.id == payload.id) return null
-                        // Determine the connection-id to insert before (or null = append).
-                        val insertBeforeId = if (dropAbove) {
-                            obj.id
-                        } else {
-                            // Insert before the next sibling, if any
-                            siblingConnectionAfter(node)?.id
-                        }
-                        if (obj.folderId == null) {
-                            DropTarget.MoveConnectionToRoot(payload.id, insertBeforeId)
-                        } else {
-                            DropTarget.MoveConnectionToFolder(payload.id, obj.folderId!!, insertBeforeId)
-                        }
-                    }
-                    else -> DropTarget.MoveConnectionToRoot(payload.id)
-                }
+        // Folder rows have 3 zones; connection rows have 2 (halves).
+        val zoneAbove: Boolean
+        val zoneInto: Boolean
+        val zoneBelow: Boolean
+        if (rowBounds != null) {
+            val relY = y - rowBounds.y
+            if (node?.userObject is SshFolder) {
+                zoneAbove = relY < rowBounds.height / 4
+                zoneBelow = relY >= rowBounds.height * 3 / 4
+                zoneInto = !zoneAbove && !zoneBelow
+            } else {
+                val midpoint = rowBounds.height / 2
+                zoneAbove = relY < midpoint
+                zoneBelow = !zoneAbove
+                zoneInto = false
             }
-            is DraggedFolder -> {
-                if (node == null) {
-                    val lastIndex = connectionStorageService.getFolders().size
-                    return DropTarget.ReorderFolderTo(payload.id, lastIndex)
-                }
-                val obj = node.userObject
-                if (obj !is SshFolder) {
-                    // dropping a folder on a connection is rejected
-                    return null
-                }
-                if (obj.id == payload.id) return null
-                val targetIdx = connectionStorageService.getFolders().indexOfFirst { it.id == obj.id }
-                val newIndex = if (dropAbove) targetIdx else targetIdx + 1
-                return DropTarget.ReorderFolderTo(payload.id, newIndex)
-            }
-            else -> return null
+        } else {
+            zoneAbove = false; zoneInto = false; zoneBelow = false
+        }
+
+        return when (payload) {
+            is DraggedConnection -> resolveConnectionDrop(payload.id, node, zoneAbove, zoneInto, zoneBelow)
+            is DraggedFolder -> resolveFolderDrop(payload.id, node, zoneAbove, zoneInto, zoneBelow)
+            else -> null
         }
     }
 
-    /** Returns the connection node immediately after [node] under the same parent, or null. */
-    private fun siblingConnectionAfter(node: DefaultMutableTreeNode): SshConnectionData? {
-        val parent = node.parent as? DefaultMutableTreeNode ?: return null
-        val idx = parent.getIndex(node)
-        if (idx < 0 || idx + 1 >= parent.childCount) return null
-        val next = parent.getChildAt(idx + 1) as? DefaultMutableTreeNode ?: return null
-        return next.userObject as? SshConnectionData
-    }
-
-    private fun applyDrop(payload: Any?, target: DropTarget) {
-        when (target) {
-            is DropTarget.MoveConnectionToFolder -> {
-                connectionStorageService.moveConnection(target.connectionId, target.folderId)
-                target.insertBeforeConnectionId?.let { beforeId ->
-                    val connections = connectionStorageService.getConnections()
-                    val beforeIdx = connections.indexOfFirst { it.id == beforeId }
-                    if (beforeIdx >= 0) {
-                        val currentIdx = connections.indexOfFirst { it.id == target.connectionId }
-                        val adjustedIdx = if (currentIdx in 0 until beforeIdx) beforeIdx - 1 else beforeIdx
-                        connectionStorageService.reorderConnection(target.connectionId, adjustedIdx)
-                    }
+    private fun resolveConnectionDrop(
+        connId: String,
+        node: DefaultMutableTreeNode?,
+        zoneAbove: Boolean,
+        zoneInto: Boolean,
+        @Suppress("UNUSED_PARAMETER") zoneBelow: Boolean
+    ): PlaceItem? {
+        if (node == null) {
+            // Empty space: append to root.
+            val rootMax = maxRootOrder()
+            return PlaceItem(connId, null, rootMax + 1)
+        }
+        return when (val obj = node.userObject) {
+            is SshFolder -> when {
+                zoneAbove -> PlaceItem(connId, null, obj.order)
+                zoneInto -> {
+                    val folderChildrenMax = connectionStorageService.getConnections()
+                        .filter { it.folderId == obj.id }
+                        .maxOfOrNull { it.order } ?: -1
+                    PlaceItem(connId, obj.id, folderChildrenMax + 1)
                 }
+                else /* below */ -> PlaceItem(connId, null, obj.order + 1)
             }
-            is DropTarget.MoveConnectionToRoot -> {
-                connectionStorageService.moveConnection(target.connectionId, null)
-                target.insertBeforeConnectionId?.let { beforeId ->
-                    val connections = connectionStorageService.getConnections()
-                    val beforeIdx = connections.indexOfFirst { it.id == beforeId }
-                    if (beforeIdx >= 0) {
-                        val currentIdx = connections.indexOfFirst { it.id == target.connectionId }
-                        val adjustedIdx = if (currentIdx in 0 until beforeIdx) beforeIdx - 1 else beforeIdx
-                        connectionStorageService.reorderConnection(target.connectionId, adjustedIdx)
-                    }
-                }
+            is SshConnectionData -> {
+                if (obj.id == connId) null
+                else if (zoneAbove) PlaceItem(connId, obj.folderId, obj.order)
+                else PlaceItem(connId, obj.folderId, obj.order + 1)
             }
-            is DropTarget.ReorderFolderTo -> {
-                val folders = connectionStorageService.getFolders()
-                val currentIdx = folders.indexOfFirst { it.id == target.folderId }
-                val adjustedIdx = if (currentIdx in 0 until target.newIndex) target.newIndex - 1 else target.newIndex
-                connectionStorageService.reorderFolder(target.folderId, adjustedIdx)
+            else -> {
+                // Root node or unknown: append to root.
+                val rootMax = maxRootOrder()
+                PlaceItem(connId, null, rootMax + 1)
             }
         }
+    }
+
+    private fun resolveFolderDrop(
+        folderId: String,
+        node: DefaultMutableTreeNode?,
+        zoneAbove: Boolean,
+        zoneInto: Boolean,
+        @Suppress("UNUSED_PARAMETER") zoneBelow: Boolean
+    ): PlaceItem? {
+        if (node == null) {
+            // Empty space: append at end of root.
+            val rootMax = maxRootOrder()
+            return PlaceItem(folderId, null, rootMax + 1)
+        }
+        return when (val obj = node.userObject) {
+            is SshFolder -> {
+                if (obj.id == folderId) null
+                else when {
+                    zoneAbove -> PlaceItem(folderId, null, obj.order)
+                    zoneInto -> null // No folder nesting.
+                    else /* below */ -> PlaceItem(folderId, null, obj.order + 1)
+                }
+            }
+            is SshConnectionData -> {
+                // A folder dropped on a connection only makes sense if the connection is at root
+                // (otherwise the implied "root position" is ambiguous).
+                if (obj.folderId != null) null
+                else if (zoneAbove) PlaceItem(folderId, null, obj.order)
+                else PlaceItem(folderId, null, obj.order + 1)
+            }
+            else -> {
+                val rootMax = maxRootOrder()
+                PlaceItem(folderId, null, rootMax + 1)
+            }
+        }
+    }
+
+    /** Max order across all root-scope items (folders + root connections); -1 if scope is empty. */
+    private fun maxRootOrder(): Int {
+        val foldersMax = connectionStorageService.getFolders().maxOfOrNull { it.order } ?: -1
+        val rootConnsMax = connectionStorageService.getConnections()
+            .filter { it.folderId == null }
+            .maxOfOrNull { it.order } ?: -1
+        return maxOf(foldersMax, rootConnsMax)
+    }
+
+    private fun applyDrop(target: PlaceItem) {
+        connectionStorageService.placeAt(target.itemId, target.parentFolderId, target.targetOrder)
     }
 
     override fun dispose() {
