@@ -22,7 +22,8 @@ data class SshConnectionData(
     @Attribute("keyPath") var keyPath: String = "", // Path to the SSH key file
     var encodedKeyPassword: String? = null, // Placeholder for securely stored key password
     @Attribute("maximizeTerminal") var maximizeTerminal: Boolean = false, // Whether to maximize terminal on connect
-    @Attribute("folderId") var folderId: String? = null // ID of containing folder, null = root
+    @Attribute("folderId") var folderId: String? = null, // ID of containing folder, null = root
+    @Attribute("order") var order: Int = 0 // Position within containing scope (root or folder)
 ) {
     // Default constructor for XML serialization
     constructor() : this(id = java.util.UUID.randomUUID().toString())
