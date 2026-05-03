@@ -303,7 +303,8 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
             encodedPassword = withPasswords.encodedPassword,
             encodedSudoPassword = withPasswords.encodedSudoPassword,
             encodedKeyPassword = withPasswords.encodedKeyPassword,
-            folderId = withPasswords.folderId
+            folderId = withPasswords.folderId,
+            order = 0 // addConnection will assign (max in scope)+1, appending after the original
         )
         connectionStorageService.addConnection(duplicated)
         reloadTree()
