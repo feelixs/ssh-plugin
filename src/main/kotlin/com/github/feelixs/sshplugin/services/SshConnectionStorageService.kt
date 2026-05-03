@@ -163,7 +163,18 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     fun addConnection(connection: SshConnectionData) {
-        // Ensure we encrypt passwords when adding a connection
+        // Auto-assign order = (max in target scope) + 1; 0 if scope empty.
+        // Scope is determined by the connection's folderId, which the caller already set.
+        val scopeMax = internalState.connections
+            .filter { it.folderId == connection.folderId }
+            .maxOfOrNull { it.order } ?: -1
+        val rootScopeMax = if (connection.folderId == null) {
+            // Root scope also includes folders
+            maxOf(scopeMax, internalState.folders.maxOfOrNull { it.order } ?: -1)
+        } else {
+            scopeMax
+        }
+        connection.order = rootScopeMax + 1
         encryptConnectionPasswords(connection)
         internalState.connections.add(connection)
     }
@@ -247,6 +258,12 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
     }
 
     fun addFolder(folder: SshFolder) {
+        // Folders are always at root; root scope = folders + root connections.
+        val foldersMax = internalState.folders.maxOfOrNull { it.order } ?: -1
+        val rootConnectionsMax = internalState.connections
+            .filter { it.folderId == null }
+            .maxOfOrNull { it.order } ?: -1
+        folder.order = maxOf(foldersMax, rootConnectionsMax) + 1
         internalState.folders.add(folder)
     }
 
