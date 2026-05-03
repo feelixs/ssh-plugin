@@ -267,8 +267,9 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         val dialog = SshConnectionDialog(project, connectionWithPasswords)
         if (dialog.showAndGet()) {
             val updated = dialog.createConnectionData()
-            // Preserve folderId across edit (dialog doesn't expose it)
+            // Preserve folderId and order across edit (dialog exposes neither)
             updated.folderId = selectedConnection.folderId
+            updated.order = selectedConnection.order
             connectionStorageService.updateConnection(updated)
             reloadTree()
         }
