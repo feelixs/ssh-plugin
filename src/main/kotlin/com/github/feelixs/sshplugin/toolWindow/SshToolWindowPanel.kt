@@ -57,6 +57,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         setContent(scrollPane)
         installPopupMenu()
         installDnD()
+        installDoubleClickHandler()
     }
 
     /**
@@ -409,6 +410,18 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
                 reloadTree()
             }
             .install()
+    }
+
+    private fun installDoubleClickHandler() {
+        tree.addMouseListener(object : java.awt.event.MouseAdapter() {
+            override fun mouseClicked(e: java.awt.event.MouseEvent) {
+                if (e.clickCount != 2 || e.button != java.awt.event.MouseEvent.BUTTON1) return
+                val path = tree.getPathForLocation(e.x, e.y) ?: return
+                val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return
+                val conn = node.userObject as? SshConnectionData ?: return
+                executor.executeConnection(conn.id)
+            }
+        })
     }
 
     private data class DraggedConnection(val id: String)
