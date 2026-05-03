@@ -335,6 +335,29 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
         )
     }
 
+    /** Render a translucent ghost of the cell at [path] for use as a drag preview image. */
+    private fun renderGhostImage(path: javax.swing.tree.TreePath): java.awt.image.BufferedImage? {
+        val node = path.lastPathComponent as? DefaultMutableTreeNode ?: return null
+        val row = tree.getRowForPath(path)
+        val component = tree.cellRenderer.getTreeCellRendererComponent(
+            tree, node, /* selected */ false, /* expanded */ false,
+            /* leaf */ node.isLeaf, /* row */ row, /* hasFocus */ false
+        )
+        component.size = component.preferredSize
+        if (component.width <= 0 || component.height <= 0) return null
+        val img = com.intellij.util.ui.ImageUtil.createImage(
+            component.width, component.height, java.awt.image.BufferedImage.TYPE_INT_ARGB
+        )
+        val g = img.createGraphics()
+        try {
+            g.composite = java.awt.AlphaComposite.getInstance(java.awt.AlphaComposite.SRC_OVER, 0.5f)
+            component.paint(g)
+        } finally {
+            g.dispose()
+        }
+        return img
+    }
+
     private fun installDnD() {
         com.intellij.ide.dnd.DnDSupport.createBuilder(tree)
             .setBeanProvider { info ->
@@ -345,6 +368,12 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
                     is SshFolder -> com.intellij.ide.dnd.DnDDragStartBean(DraggedFolder(obj.id))
                     else -> null
                 }
+            }
+            .setImageProvider { info ->
+                val path = tree.getPathForLocation(info.point.x, info.point.y)
+                    ?: return@setImageProvider null
+                val img = renderGhostImage(path) ?: return@setImageProvider null
+                com.intellij.ide.dnd.DnDImage(img, java.awt.Point(0, 0))
             }
             .setTargetChecker { event ->
                 val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject)
