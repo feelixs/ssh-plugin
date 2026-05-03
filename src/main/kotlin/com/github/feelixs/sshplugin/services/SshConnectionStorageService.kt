@@ -64,6 +64,40 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         for (connection in internalState.connections) {
             decryptConnectionPasswords(connection)
         }
+        normalizeOrder()
+    }
+
+    /**
+     * For each scope (root, and each folder), if every item has order == 0, assign
+     * sequential order values 0, 1, 2, ... in current list-position order. This
+     * preserves a user's existing arrangement on first load after upgrade. After
+     * any user reorder the scope has at least one non-zero order, so this is a no-op.
+     */
+    private fun normalizeOrder() {
+        // --- Root scope: folders (in folders-list order) followed by root connections (in connections-list order). ---
+        val rootFolders = internalState.folders
+        val rootConnections = internalState.connections.filter { it.folderId == null }
+        val rootAllZero = rootFolders.all { it.order == 0 } && rootConnections.all { it.order == 0 }
+        if (rootAllZero && (rootFolders.isNotEmpty() || rootConnections.isNotEmpty())) {
+            var i = 0
+            for (folder in rootFolders) {
+                folder.order = i++
+            }
+            for (conn in rootConnections) {
+                conn.order = i++
+            }
+        }
+        // --- Each folder's connection scope. ---
+        for (folder in internalState.folders) {
+            val children = internalState.connections.filter { it.folderId == folder.id }
+            if (children.isEmpty()) continue
+            if (children.all { it.order == 0 }) {
+                var j = 0
+                for (conn in children) {
+                    conn.order = j++
+                }
+            }
+        }
     }
 
     // --- Password encryption/decryption ---
