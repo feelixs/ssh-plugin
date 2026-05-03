@@ -331,4 +331,61 @@ class SshConnectionStorageService : PersistentStateComponent<SshConnectionStorag
         val safeIndex = newIndexInList.coerceIn(0, internalState.folders.size)
         internalState.folders.add(safeIndex, item)
     }
+
+    /**
+     * Places an item (folder or connection) at [targetOrder] within [parentFolderId].
+     * Increments order on every other item in the same scope where order >= targetOrder.
+     *
+     * For folders, [parentFolderId] is ignored — folders are always placed at root.
+     * For a connection, if [parentFolderId] is non-null but no folder with that id
+     * exists, this is a no-op.
+     *
+     * Missing item id is a no-op. [targetOrder] is clamped to non-negative.
+     */
+    fun placeAt(itemId: String, parentFolderId: String?, targetOrder: Int) {
+        val safeOrder = maxOf(targetOrder, 0)
+        val folder = internalState.folders.find { it.id == itemId }
+        if (folder != null) {
+            // Folder placement: always at root scope.
+            // Increment order on other folders and root connections where order >= safeOrder.
+            for (otherFolder in internalState.folders) {
+                if (otherFolder.id != itemId && otherFolder.order >= safeOrder) {
+                    otherFolder.order += 1
+                }
+            }
+            for (conn in internalState.connections) {
+                if (conn.folderId == null && conn.order >= safeOrder) {
+                    conn.order += 1
+                }
+            }
+            folder.order = safeOrder
+            return
+        }
+        val connection = internalState.connections.find { it.id == itemId } ?: return
+        // Validate target folder if specified.
+        if (parentFolderId != null && internalState.folders.none { it.id == parentFolderId }) {
+            return
+        }
+        // Connection placement scope:
+        //   - parentFolderId == null: root scope (folders + root connections).
+        //   - parentFolderId != null: connections in that folder.
+        if (parentFolderId == null) {
+            for (otherFolder in internalState.folders) {
+                if (otherFolder.order >= safeOrder) otherFolder.order += 1
+            }
+            for (otherConn in internalState.connections) {
+                if (otherConn.id != itemId && otherConn.folderId == null && otherConn.order >= safeOrder) {
+                    otherConn.order += 1
+                }
+            }
+        } else {
+            for (otherConn in internalState.connections) {
+                if (otherConn.id != itemId && otherConn.folderId == parentFolderId && otherConn.order >= safeOrder) {
+                    otherConn.order += 1
+                }
+            }
+        }
+        connection.folderId = parentFolderId
+        connection.order = safeOrder
+    }
 }
