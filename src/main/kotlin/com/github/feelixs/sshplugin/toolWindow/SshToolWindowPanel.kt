@@ -26,7 +26,7 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
     private val connectionStorageService = SshConnectionStorageService.instance
     private val rootNode = DefaultMutableTreeNode("ROOT")
     private val treeModel = DefaultTreeModel(rootNode)
-    private val tree = Tree(treeModel)
+    private val tree = DropAwareTree(treeModel)
     val executor = project.getService(SshConnectionExecutor::class.java)
 
     private val refreshTimer = Timer("SSH-Connection-Status-Timer", true)
@@ -349,10 +349,33 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
             .setTargetChecker { event ->
                 val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject)
                 event.isDropPossible = target != null
+                // Compute visual hint.
+                val newHint: DropHint? = if (target == null) {
+                    null
+                } else {
+                    // For drop-into-folder, target.parentFolderId is the folder id and the
+                    // gesture targets the folder body (zone "into") — show highlight.
+                    // We detect this by checking if the drop point's row is the target folder.
+                    val path = tree.getPathForLocation(event.point.x, event.point.y)
+                    val hoveredNode = path?.lastPathComponent as? DefaultMutableTreeNode
+                    val hoveredFolder = hoveredNode?.userObject as? SshFolder
+                    if (hoveredFolder != null && hoveredFolder.id == target.parentFolderId) {
+                        DropHint.HighlightFolder(hoveredNode)
+                    } else {
+                        dropHintFor(target)
+                    }
+                }
+                if (newHint != dropHint) {
+                    dropHint = newHint
+                    tree.repaint()
+                }
                 true
             }
             .setDropHandler { event ->
-                val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject) ?: return@setDropHandler
+                val target = resolveDropTarget(event.point.x, event.point.y, event.attachedObject)
+                dropHint = null
+                tree.repaint()
+                if (target == null) return@setDropHandler
                 applyDrop(target)
                 reloadTree()
             }
@@ -367,6 +390,15 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
      * [parentFolderId] (null = root). null return from resolveDropTarget = reject.
      */
     private data class PlaceItem(val itemId: String, val parentFolderId: String?, val targetOrder: Int)
+
+    private sealed class DropHint {
+        /** Draw a horizontal insert line between siblings of [parent] at [insertIndex]. */
+        data class InsertLine(val parent: DefaultMutableTreeNode, val insertIndex: Int) : DropHint()
+        /** Draw a tinted background on the folder row. */
+        data class HighlightFolder(val folderNode: DefaultMutableTreeNode) : DropHint()
+    }
+
+    private var dropHint: DropHint? = null
 
     private fun resolveDropTarget(x: Int, y: Int, payload: Any?): PlaceItem? {
         val path = tree.getPathForLocation(x, y)
@@ -482,6 +514,94 @@ class SshToolWindowPanel(private val project: Project) : SimpleToolWindowPanel(t
 
     private fun applyDrop(target: PlaceItem) {
         connectionStorageService.placeAt(target.itemId, target.parentFolderId, target.targetOrder)
+    }
+
+    /**
+     * Translate a [PlaceItem] into a [DropHint] for visual feedback.
+     * Returns null if no hint should be shown (caller should set dropHint = null).
+     *
+     * The insert-line visual index is the count of CURRENT children whose order
+     * is strictly less than [PlaceItem.targetOrder] — counting the moved item
+     * normally if it is in this scope. This produces a line at the visual
+     * position the dropped item will land at, regardless of whether the move is
+     * forward, backward, or cross-scope.
+     */
+    private fun dropHintFor(target: PlaceItem): DropHint? {
+        val parentNode: DefaultMutableTreeNode = if (target.parentFolderId == null) {
+            rootNode
+        } else {
+            findFolderNode(target.parentFolderId) ?: return null
+        }
+        val orders = (0 until parentNode.childCount).map { i ->
+            val child = parentNode.getChildAt(i) as DefaultMutableTreeNode
+            when (val obj = child.userObject) {
+                is SshConnectionData -> obj.order
+                is SshFolder -> obj.order
+                else -> Int.MAX_VALUE
+            }
+        }
+        val insertIndex = orders.count { it < target.targetOrder }
+        return DropHint.InsertLine(parentNode, insertIndex)
+    }
+
+    /** Find a folder node in the current tree by id. */
+    private fun findFolderNode(folderId: String): DefaultMutableTreeNode? {
+        for (i in 0 until rootNode.childCount) {
+            val child = rootNode.getChildAt(i) as DefaultMutableTreeNode
+            val obj = child.userObject as? SshFolder ?: continue
+            if (obj.id == folderId) return child
+        }
+        return null
+    }
+
+    private inner class DropAwareTree(model: javax.swing.tree.TreeModel) : Tree(model) {
+        override fun paintComponent(g: java.awt.Graphics) {
+            super.paintComponent(g)
+            val hint = dropHint ?: return
+            val g2 = g.create() as java.awt.Graphics2D
+            try {
+                g2.setRenderingHint(
+                    java.awt.RenderingHints.KEY_ANTIALIASING,
+                    java.awt.RenderingHints.VALUE_ANTIALIAS_ON
+                )
+                when (hint) {
+                    is DropHint.InsertLine -> paintInsertLine(g2, hint)
+                    is DropHint.HighlightFolder -> paintFolderHighlight(g2, hint)
+                }
+            } finally {
+                g2.dispose()
+            }
+        }
+
+        private fun paintInsertLine(g2: java.awt.Graphics2D, hint: DropHint.InsertLine) {
+            val parent = hint.parent
+            val y = when {
+                parent.childCount == 0 -> {
+                    val parentBounds = this.getPathBounds(javax.swing.tree.TreePath(parent.path)) ?: return
+                    parentBounds.y + parentBounds.height
+                }
+                hint.insertIndex < parent.childCount -> {
+                    val child = parent.getChildAt(hint.insertIndex) as DefaultMutableTreeNode
+                    val bounds = this.getPathBounds(javax.swing.tree.TreePath(child.path)) ?: return
+                    bounds.y
+                }
+                else -> {
+                    val lastChild = parent.getChildAt(parent.childCount - 1) as DefaultMutableTreeNode
+                    val bounds = this.getPathBounds(javax.swing.tree.TreePath(lastChild.path)) ?: return
+                    bounds.y + bounds.height
+                }
+            }
+            g2.color = com.intellij.ui.JBColor.BLUE
+            g2.stroke = java.awt.BasicStroke(2f)
+            g2.drawLine(8, y, this.width - 8, y)
+        }
+
+        private fun paintFolderHighlight(g2: java.awt.Graphics2D, hint: DropHint.HighlightFolder) {
+            val bounds = this.getPathBounds(javax.swing.tree.TreePath(hint.folderNode.path)) ?: return
+            val base = com.intellij.ui.JBColor.BLUE
+            g2.color = java.awt.Color(base.red, base.green, base.blue, 60)
+            g2.fillRect(bounds.x, bounds.y, this.width - bounds.x, bounds.height)
+        }
     }
 
     override fun dispose() {
